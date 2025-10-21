@@ -1,8 +1,7 @@
 import { tintColors } from "@/constants/colorSettings";
-import icons from "@/constants/icons";
 import { openBrowserAsync } from "expo-web-browser";
 import React from "react";
-import { Image, Pressable } from "react-native";
+import { Pressable } from "react-native";
 import ThemedText from "./textThemed";
 
 const ExternalLink = ({
@@ -18,7 +17,9 @@ const ExternalLink = ({
 
   return (
     <Pressable onPress={handlePress} className=" flex-row items-end pr-[5px] ">
-      <ThemedText style={{color:tintColors.info}} className=" mr-[10px] ">{children}</ThemedText>
+      <ThemedText style={{ color: tintColors.info }} className=" mr-[10px] ">
+        {children}
+      </ThemedText>
     </Pressable>
   );
 };

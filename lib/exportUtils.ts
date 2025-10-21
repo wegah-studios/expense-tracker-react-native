@@ -3,7 +3,7 @@ import { Expense, ManifestEntry } from "@/types/common";
 import CryptoJS from "crypto-js";
 import dayjs from "dayjs";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";

@@ -21,7 +21,7 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ToastAndroid, View } from "react-native";
 import MoveModal from "../expenses/moveModal";

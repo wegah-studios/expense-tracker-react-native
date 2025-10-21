@@ -4,16 +4,25 @@ import EditExpense from "@/components/edit/expense";
 import ParseMessages from "@/components/edit/messages";
 import AddExpenseModal from "@/components/expenses/addExpenseModal";
 import FeedbackModal from "@/components/feedbackModal";
+import SmsCaptureModal from "@/components/smsCaptureModal";
 import StatusModal from "@/components/statusModal";
 import { tintColors } from "@/constants/colorSettings";
-import { EditingContextProps, Status } from "@/types/common";
-import BottomSheet, { SNAP_POINT_TYPE } from "@gorhom/bottom-sheet";
-import React, { createContext, useContext, useRef, useState } from "react";
+import { EditingContextProps, SmsCaptureMode, Status } from "@/types/common";
+import BottomSheet from "@gorhom/bottom-sheet";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Keyboard } from "react-native";
 
 const EditingContext = createContext<{
   open: (props: EditingContextProps) => void;
   close: () => void;
+  isSmsCaptureModal: boolean;
   setStatus: React.Dispatch<React.SetStateAction<Status>>;
   setAddExpenseModal: React.Dispatch<React.SetStateAction<boolean>>;
   setFeedbackModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -45,10 +54,31 @@ export const EditingContexProvider = ({
       callback() {},
     },
   });
+
   const [props, setProps] = useState<EditingContextProps>({
     type: "",
     snapPoints: ["75%"],
   });
+  const [smsCaptureModal, setSmsCaptureModal] = useState<SmsCaptureMode>({
+    open: false,
+    type: "loading",
+  });
+  const [smsChecked, setSmsChecked] = useState<boolean>(false);
+  const isSmsCaptureModal = useMemo(
+    () => smsCaptureModal.open,
+    [smsCaptureModal.open]
+  );
+  useEffect(() => {
+    if (!smsChecked) {
+      setSmsCaptureModal({
+        open: true,
+        type: "loading",
+        fetchMessages: true,
+      });
+      setSmsChecked(true);
+    }
+  }, [smsChecked]);
+
   const ref = useRef<BottomSheet>(null);
 
   const open = (props: EditingContextProps) => {
@@ -86,6 +116,7 @@ export const EditingContexProvider = ({
       value={{
         open,
         close,
+        isSmsCaptureModal,
         setStatus,
         handleStatusClose,
         setAddExpenseModal,
@@ -110,6 +141,7 @@ export const EditingContexProvider = ({
         open={feedbackModal}
         handleClose={() => setFeedbackModal(false)}
       />
+      <SmsCaptureModal mode={smsCaptureModal} setMode={setSmsCaptureModal} />
       <AddExpenseModal
         open={addExpenseModal}
         openEditSheet={open}

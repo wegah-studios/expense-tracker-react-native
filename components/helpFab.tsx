@@ -8,7 +8,7 @@ const HelpFab = () => {
   const { setFeedbackModal } = useEditingContext();
   const handlePress = async () => {
     await openBrowserAsync(
-      "https://expense-tracker-wegah-studios.netlify.app/#faq"
+      "https://qwantu.wegahstudios.com/help"
     );
   };
   const handleLongPress = () => {

@@ -1,7 +1,7 @@
 import db from "@/db/schema";
 import { DictionaryItem, Expense } from "@/types/common";
 import { nanoid } from "nanoid/non-secure";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 import { normalizeString } from "./appUtils";
 import { updateBudgets } from "./budgetUtils";
 import { addToCollection, removeFromCollection } from "./collectionsUtils";
@@ -328,21 +328,22 @@ export const updateMultipleExpenses = async (
   return map;
 };
 
-export const parseReceipts = async (receiptString: string) => {
+export const parseMessages = async (str: string) => {
   const expenses: Partial<Expense>[] = [];
-  const receipts: string[] = await new Promise((resolve, reject) => {
-    const data = receiptString.split(/confirmed/i);
+  const messages: string[] = await new Promise((resolve, reject) => {
+    const data = str.split(/confirmed/i);
     resolve(data);
   });
 
   await db.withTransactionAsync(async () => {
     const promises = [];
-    for (let i = 0; i < receipts.length; i++) {
-      let ref = receipts[i].slice(-11).trim();
+    for (let i = 0; i < messages.length; i++) {
+      let ref = messages[i].slice(-11).trim();
 
       if (/^(?=.*\d)[A-Z\d]{10}$/.test(ref)) {
-        let receipt: string = receipts[i + 1].slice(0, -11);
-        promises.push(handleReceipt(ref, receipt, expenses));
+        let message: string =
+          ref + " confirmed " + messages[i + 1].slice(0, -11);
+        promises.push(handleMessage(message, expenses));
       }
     }
     await Promise.all(promises);
@@ -350,18 +351,16 @@ export const parseReceipts = async (receiptString: string) => {
   return expenses;
 };
 
-const handleReceipt = async (
-  ref: string,
-  receipt: string,
+export const handleMessage = async (
+  message: string,
   expenses: Partial<Expense>[]
 ) => {
-  receipt = `${ref} confirmed` + normalizeString(receipt);
-  if (!/(sent to|paid to|you bought|withdraw)/i.test(receipt)) {
+  if (!/(sent to|paid to|you bought|withdraw)/i.test(message)) {
     return;
   }
 
   let data: Partial<Expense> = await new Promise((resolve, reject) => {
-    const result = parseReceipt(receipt);
+    const result = parseMessage(message);
     resolve(result);
   });
 
@@ -370,9 +369,9 @@ const handleReceipt = async (
   data = {
     ...data,
     id: nanoid(),
-    ref,
-    receipt,
+    receipt: message,
     label,
+    currency: "Ksh",
   };
 
   if (data.amount === undefined || !data.date || !data.recipient) {
@@ -384,17 +383,19 @@ const handleReceipt = async (
   expenses.push(data);
 };
 
-const parseReceipt = (receipt: string) => {
-  const recipientMatch = receipt.match(/to (.+?) on|from (.+?) new/i);
-  const amountMatch = receipt.match(/ksh(\d{1,3}(,\d{3})*(\.\d{2})?)/i);
-  const transactionCostMatch = receipt.match(
+const parseMessage = (message: string) => {
+  const ref = message.trim().substring(0, 11);
+  message = ref + " " + normalizeString(message.slice(10));
+  const recipientMatch = message.match(/to (.+?) on|from (.+?) new/i);
+  const amountMatch = message.match(/ksh(\d{1,3}(,\d{3})*(\.\d{2})?)/i);
+  const transactionCostMatch = message.match(
     /transaction cost, ksh(\d{1,3}(,\d{3})*(\.\d{2})?)/i
   );
-  const airtimeMatch = receipt.match(
+  const airtimeMatch = message.match(
     /you bought ksh\d{1,3}(,\d{3})*(\.\d{2})? of airtime/i
   );
-  const dateMatch = receipt.match(/on (\d{1,2}\/\d{1,2}\/\d{2,4})/);
-  const timeMatch = receipt.match(/at (\d{1,2}:\d{2} (?:am|pm))/i);
+  const dateMatch = message.match(/on (\d{1,2}\/\d{1,2}\/\d{2,4})/);
+  const timeMatch = message.match(/at (\d{1,2}:\d{2} (?:am|pm))/i);
 
   const recipient: string | undefined =
     recipientMatch?.[1]?.trim() ||
@@ -440,6 +441,7 @@ const parseReceipt = (receipt: string) => {
   }
 
   return {
+    ref,
     amount,
     recipient,
     date: dateTime,
@@ -647,6 +649,18 @@ export const parseExcelFile = async (b64: string) => {
       }
     }
 
+    await Promise.all(promises);
+  });
+  return expenses;
+};
+
+export const importFromSMSListener = async (messages: string[]) => {
+  const expenses: Partial<Expense>[] = [];
+  await db.withTransactionAsync(async () => {
+    const promises: Promise<any>[] = [];
+    for (let message of messages) {
+      promises.push(handleMessage(message, expenses));
+    }
     await Promise.all(promises);
   });
   return expenses;

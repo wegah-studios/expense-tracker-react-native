@@ -1,7 +1,7 @@
 import icons from "@/constants/icons";
 import { toastError } from "@/lib/appUtils";
 import { pasteFromClipboard } from "@/lib/clipboardUtils";
-import { parseReceipts } from "@/lib/expenseUtils";
+import { parseMessages } from "@/lib/expenseUtils";
 import { Expense, Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
@@ -10,7 +10,7 @@ import InputField from "../inputField";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
-const ParseMessages = (props: Record<string, any>) => {
+const Messages = (props: Record<string, any>) => {
   const { handleUpdate, close, setStatus, handleStatusClose } = props as {
     handleUpdate: (expenses: Partial<Expense>[]) => void;
     close: () => void;
@@ -48,7 +48,7 @@ const ParseMessages = (props: Record<string, any>) => {
       action: { callback() {} },
     });
     try {
-      const data = await parseReceipts(receipt);
+      const data = await parseMessages(receipt);
       if (!data.length) {
         toastError(
           new Error(`No expenses found`, { cause: 1 }),
@@ -155,4 +155,4 @@ const ParseMessages = (props: Record<string, any>) => {
   );
 };
 
-export default ParseMessages;
+export default Messages;

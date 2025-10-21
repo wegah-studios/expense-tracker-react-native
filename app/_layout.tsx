@@ -40,10 +40,11 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <EditingContexProvider>
               <Slot />
+              <PathInfoModal />
             </EditingContexProvider>
           </GestureHandlerRootView>
         </SafeAreaView>
-        <PathInfoModal />
+        
       </CustomThemeContextProvider>
     );
   } catch (error) {

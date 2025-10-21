@@ -1,4 +1,5 @@
 import icons from "@/constants/icons";
+import { useEditingContext } from "@/context/editingContext";
 import { toastError } from "@/lib/appUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
 import { usePathname } from "expo-router";
@@ -22,7 +23,7 @@ const PathInfoModal = () => {
         {
           icon: icons.logo,
           title: `Important note`,
-          description: `All your data is stored securely on your device and only you have access to it. By using this app you agree to our ^Terms of use</>https://expense-tracker-wegah-studios.netlify.app/legal/terms-of-service^ and ^Privacy policy</>https://expense-tracker-wegah-studios.netlify.app/legal/privacy-policy^.`,
+          description: `All your data is stored securely on your device and only you have access to it. By using this app you agree to our ^Terms of use</>https://qwantu.wegahstudios.com/terms-of-service^ and ^Privacy policy</>https://qwantu.wegahstudios.com/privacy-policy^.`,
         },
         {
           icon: icons.logo,
@@ -67,6 +68,7 @@ const PathInfoModal = () => {
     []
   );
 
+  const { isSmsCaptureModal } = useEditingContext();
   const pathname = usePathname();
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<boolean>(false);
@@ -88,7 +90,7 @@ const PathInfoModal = () => {
   >(() => info[step], [info, step]);
 
   useEffect(() => {
-    if (content[pathname] && !seen.has(pathname)) {
+    if (content[pathname] && !seen.has(pathname) && !isSmsCaptureModal) {
       const fetchPreferences = async () => {
         const preferences = await getPreferences(pathname);
         let currentStep = 0;
@@ -105,7 +107,7 @@ const PathInfoModal = () => {
       };
       fetchPreferences();
     }
-  }, [pathname]);
+  }, [pathname, isSmsCaptureModal]);
 
   const handleClose = () => {
     try {
@@ -132,54 +134,56 @@ const PathInfoModal = () => {
   };
 
   return (
-    active && (
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={open}
-        onRequestClose={handleClose}
-      >
-        <Pressable
-          onPress={handleClose}
-          className=" flex-1 bg-black/50 flex-row justify-center items-center "
+    <>
+      {active && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={open}
+          onRequestClose={handleClose}
         >
           <Pressable
-            onPress={() => {}}
-            style={{ height: "auto" }}
-            className=" flex-col gap-[20px] items-center w-[90vw] max-w-[600px] p-[20px] bg-white rounded-[20px] dark:bg-paper-dark "
+            onPress={handleClose}
+            className=" flex-1 bg-black/50 flex-row justify-center items-center "
           >
-            <ThemedIcon
-              toggleOnDark={pathname !== "/"}
-              source={active.icon}
-              className=" w-[30px] h-[30px] rounded-[10px] "
-            />
-            <ThemedText className=" font-urbanistBold text-[1.5rem] text-center ">
-              {active.title}
-            </ThemedText>
-            <ThemedText className=" tracking-[0.1em] text-center text-[1.2rem] ">
-              {active.description.split("^").map((str, index) => {
-                const [text, link] = str.split("</>");
-                return !!link ? (
-                  <ExternalLink key={index} href={link}>
-                    {text}
-                  </ExternalLink>
-                ) : (
-                  text
-                );
-              })}
-            </ThemedText>
             <Pressable
-              onPress={handleClose}
-              className={` flex-row gap-2 p-[20px] pt-[10px] pb-[10px] rounded-[20px] bg-black dark:bg-white `}
+              onPress={() => {}}
+              style={{ height: "auto" }}
+              className=" flex-col gap-[20px] items-center w-[90vw] max-w-[600px] p-[20px] bg-white rounded-[20px] dark:bg-paper-dark "
             >
-              <ThemedText reverse className=" text-white ">
-                Ok
+              <ThemedIcon
+                toggleOnDark={pathname !== "/"}
+                source={active.icon}
+                className=" w-[30px] h-[30px] rounded-[10px] "
+              />
+              <ThemedText className=" font-urbanistBold text-[1.5rem] text-center ">
+                {active.title}
               </ThemedText>
+              <ThemedText className=" tracking-[0.1em] text-center text-[1.2rem] ">
+                {active.description.split("^").map((str, index) => {
+                  const [text, link] = str.split("</>");
+                  return !!link ? (
+                    <ExternalLink key={index} href={link}>
+                      {text}
+                    </ExternalLink>
+                  ) : (
+                    text
+                  );
+                })}
+              </ThemedText>
+              <Pressable
+                onPress={handleClose}
+                className={` flex-row gap-2 p-[20px] pt-[10px] pb-[10px] rounded-[20px] bg-black dark:bg-white `}
+              >
+                <ThemedText reverse className=" text-white ">
+                  Ok
+                </ThemedText>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    )
+        </Modal>
+      )}
+    </>
   );
 };
 

@@ -73,6 +73,7 @@ const icons = {
   select: require("../assets/images/select.png"),
   send: require("../assets/images/send.png"),
   settings: require("../assets/images/settings.png"),
+  sms: require("../assets/images/sms.png"),
   insights: {
     filled: require("../assets/images/statistics-filled.png"),
     outlined: require("../assets/images/statistics-outlined.png"),

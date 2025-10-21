@@ -4,7 +4,7 @@ import { enc, HmacSHA256 } from "crypto-js";
 import dayjs from "dayjs";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as MailComposer from "expo-mail-composer";
 import { ToastAndroid } from "react-native";
 import { zip } from "react-native-zip-archive";
@@ -63,7 +63,7 @@ export const getDateSuffix = (date: string) => {
   }
 };
 
-export const getTimeAgo = (endDate:Date, startDate?:Date) => {}
+export const getTimeAgo = (endDate: Date, startDate?: Date) => {};
 
 export const toastError = (error: any, fallback?: string) => {
   ToastAndroid.show(
@@ -75,8 +75,9 @@ export const toastError = (error: any, fallback?: string) => {
 };
 
 export const factoryReset = async () => {
-  await Promise.all([
-    db.execAsync(`
+  await db.withTransactionAsync(async () => {
+    await Promise.all([
+      db.execAsync(`
     DROP TABLE expenses;
     DROP TABLE statistics;
     DROP TABLE collections;
@@ -86,10 +87,11 @@ export const factoryReset = async () => {
     DROP TABLE notifications;
     ${schema}
     `),
-    await FileSystem.deleteAsync(`${FileSystem.documentDirectory}images`, {
-      idempotent: true,
-    }),
-  ]);
+      FileSystem.deleteAsync(`${FileSystem.documentDirectory}images`, {
+        idempotent: true,
+      }),
+    ]);
+  });
 };
 
 const saveLogs = async () => {

@@ -2,7 +2,8 @@ import { initDB } from "@/db/schema";
 import { addLog, toastError } from "@/lib/appUtils";
 import { updateExpiredBudgets } from "@/lib/budgetUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
-import { Theme } from "@/types/common";
+import { startSMSCapture } from "@/lib/smsUtils";
+import { SmsCaptureMode, Theme } from "@/types/common";
 import * as SplashScreen from "expo-splash-screen";
 import { colorScheme } from "nativewind";
 import React, {
@@ -38,6 +39,7 @@ export const CustomThemeContextProvider = ({
   const scheme = useColorScheme();
   const theme = useMemo<Theme>(() => scheme ?? "light", [scheme]);
   const [mounted, setMounted] = useState<boolean>(false);
+  
 
   const fetchDBTheme = async () => {
     try {
@@ -54,12 +56,15 @@ export const CustomThemeContextProvider = ({
     try {
       const startup = async () => {
         if (!mounted) {
-          // console.log("started up");
+          console.log("started up");
+
+          //start sms Capture
+          startSMSCapture();
+
           //init db
           await initDB();
           //fetch theme
-          await fetchDBTheme();
-          updateExpiredBudgets();
+          await Promise.all([fetchDBTheme(), updateExpiredBudgets()]);
           addLog({ type: "info", content: "Startup successfull" });
           setMounted(true);
         }

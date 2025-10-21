@@ -9,11 +9,13 @@ import { useCustomThemeContext } from "@/context/themeContext";
 import { factoryReset, toastError } from "@/lib/appUtils";
 import { exportData, importData } from "@/lib/exportUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
+import { startSMSCapture, stopSMSCapture } from "@/lib/smsUtils";
 import { nativeApplicationVersion } from "expo-application";
 import { Link, router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { isCaptureActive } from "react-native-sms-listener";
 
 const Profile = () => {
   const { setStatus, handleStatusClose, setFeedbackModal } =
@@ -23,6 +25,7 @@ const Profile = () => {
   const isDarkTheme = useMemo(() => theme === "dark", [theme]);
   const version = useMemo(() => nativeApplicationVersion, []);
   const [showFab, setShowFab] = useState<boolean>(false);
+  const [smsCapture, setSmsCapture] = useState<boolean>(false);
 
   const [zipPasswordModal, setZipPasswordModal] = useState<{
     open: boolean;
@@ -39,7 +42,10 @@ const Profile = () => {
   useEffect(() => {
     const fetchPreferences = async () => {
       try {
-        const preferences = await getPreferences("hideFab");
+        const preferences = await getPreferences("hideFab", "smsCapture");
+        if (preferences["smsCapture"] === "on") {
+          setSmsCapture(true);
+        }
         if (preferences["hideFab"] === "false") {
           setShowFab(false);
         } else {
@@ -59,6 +65,48 @@ const Profile = () => {
       }, 200);
       return !prev;
     });
+  };
+
+  const toggleSmsCapture = async () => {
+    try {
+      setStatus({
+        open: true,
+        type: "loading",
+        title: smsCapture ? "Disable capture" : "Enable capture",
+        message: `Turning ${smsCapture ? "off" : "on"} sms capture`,
+        handleClose: handleStatusClose,
+        action: {
+          callback() {},
+        },
+      });
+      if (smsCapture) {
+        await stopSMSCapture();
+      } else {
+        await startSMSCapture();
+      }
+      const isCapture = await isCaptureActive();
+
+      setStatus({
+        open: true,
+        type: "success",
+        message: `SMS capture turned ${smsCapture ? "off" : "on"}`,
+        handleClose: handleStatusClose,
+        action: { callback: handleStatusClose },
+      });
+      setSmsCapture(isCapture);
+    } catch (error) {
+      toastError(error);
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          "An error occured while updating sms capture, please try again",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+    }
   };
 
   const handleZipPasswordModalClose = async () => {
@@ -133,7 +181,7 @@ const Profile = () => {
         action: {
           callback: () => {
             router.push("/");
-            handleStatusClose()
+            handleStatusClose();
           },
         },
       });
@@ -244,7 +292,7 @@ const Profile = () => {
   };
 
   const handleLink = async () => {
-    await openBrowserAsync("https://expense-tracker-wegah-studios.netlify.app");
+    await openBrowserAsync("https://qwantu.wegahstudios.com/");
   };
 
   return (
@@ -344,6 +392,29 @@ const Profile = () => {
                       ios_backgroundColor="#3e3e3e"
                       onValueChange={toggleFab}
                       value={showFab}
+                    />
+                    <ThemedText>On</ThemedText>
+                  </View>
+                </View>
+                <View className=" flex-row justify-between items-center ">
+                  <ThemedText className=" text-[1.1rem] font-urbanistMedium ">
+                    Capture sms messages
+                  </ThemedText>
+                  <View className=" flex-row items-center gap-2 ">
+                    <ThemedText>Off</ThemedText>
+                    <Switch
+                      trackColor={{
+                        false: tintColors.divider,
+                        true: tintColors.info,
+                      }}
+                      thumbColor={
+                        isDarkTheme
+                          ? tintColors.paper.light
+                          : tintColors.paper.dark
+                      }
+                      ios_backgroundColor="#3e3e3e"
+                      onValueChange={toggleSmsCapture}
+                      value={smsCapture}
                     />
                     <ThemedText>On</ThemedText>
                   </View>
