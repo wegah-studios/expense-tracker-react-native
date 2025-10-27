@@ -7,7 +7,13 @@ import { getDictionaryCollections } from "@/lib/dictionaryUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
 
 const Dictionary = () => {
   const { setStatus, handleStatusClose } = useEditingContext();
@@ -16,6 +22,7 @@ const Dictionary = () => {
     recipients: number;
   }>({ keywords: 0, recipients: 0 });
   const [showInfo, setShowInfo] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const fetchCollections = async () => {
@@ -54,6 +61,13 @@ const Dictionary = () => {
     setShowInfo(false);
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/dictionary/main");
+    }, 500);
+  };
+
   return (
     <View className=" flex-1 ">
       <View className=" flex-row items-center ">
@@ -70,7 +84,12 @@ const Dictionary = () => {
           Dictionary
         </ThemedText>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         <View className=" flex-1 flex-col pt-[20px] gap-[30px] ">
           {showInfo && (
             <View className=" p-[20px] bg-primary rounded-[20px] flex-col gap-4 items-start  ">

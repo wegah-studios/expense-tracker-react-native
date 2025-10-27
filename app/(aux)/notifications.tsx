@@ -14,11 +14,12 @@ import {
 import { Notification } from "@/types/common";
 import { Href, router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, View } from "react-native";
+import { FlatList, Image, Pressable, RefreshControl, View } from "react-native";
 import * as Progress from "react-native-progress";
 
 const Notifications = () => {
   const { setStatus, handleStatusClose } = useEditingContext();
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState<boolean>(false);
@@ -155,6 +156,13 @@ const Notifications = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/notifications");
+    }, 500);
+  };
+
   return (
     <View className=" flex-1 pr-[10px] pl-[10px] ">
       <View className=" pt-[10px] pb-[10px] flex-col gap-2 ">
@@ -198,6 +206,9 @@ const Notifications = () => {
         <FlatList
           data={notifications}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           ListHeaderComponent={() => <View className=" p-[10px] "></View>}
           ItemSeparatorComponent={() => <View className=" p-[10px] "></View>}
           ListFooterComponent={() => (

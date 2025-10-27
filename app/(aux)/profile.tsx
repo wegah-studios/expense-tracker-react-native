@@ -8,24 +8,42 @@ import { useEditingContext } from "@/context/editingContext";
 import { useCustomThemeContext } from "@/context/themeContext";
 import { factoryReset, toastError } from "@/lib/appUtils";
 import { exportData, importData } from "@/lib/exportUtils";
+import { removePin } from "@/lib/pinUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
-import { startSMSCapture, stopSMSCapture } from "@/lib/smsUtils";
 import { nativeApplicationVersion } from "expo-application";
 import { Link, router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Switch, Text, View } from "react-native";
-import { isCaptureActive } from "react-native-sms-listener";
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 
 const Profile = () => {
-  const { setStatus, handleStatusClose, setFeedbackModal } =
+  const { setStatus, handleStatusClose, setFeedbackModal, setPinModal } =
     useEditingContext();
-  const { theme, toggleTheme, fetchDBTheme } = useCustomThemeContext();
+  const {
+    theme,
+    toggleTheme,
+    fetchDBTheme,
+    smsCaptureState,
+    updateSmsCaptureState,
+    pinProtected,
+    setPinProtected,
+  } = useCustomThemeContext();
 
   const isDarkTheme = useMemo(() => theme === "dark", [theme]);
   const version = useMemo(() => nativeApplicationVersion, []);
   const [showFab, setShowFab] = useState<boolean>(false);
-  const [smsCapture, setSmsCapture] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const isSmsCapture = useMemo(
+    () => smsCaptureState === "on",
+    [smsCaptureState]
+  );
 
   const [zipPasswordModal, setZipPasswordModal] = useState<{
     open: boolean;
@@ -42,10 +60,7 @@ const Profile = () => {
   useEffect(() => {
     const fetchPreferences = async () => {
       try {
-        const preferences = await getPreferences("hideFab", "smsCapture");
-        if (preferences["smsCapture"] === "on") {
-          setSmsCapture(true);
-        }
+        const preferences = await getPreferences("hideFab");
         if (preferences["hideFab"] === "false") {
           setShowFab(false);
         } else {
@@ -72,35 +87,34 @@ const Profile = () => {
       setStatus({
         open: true,
         type: "loading",
-        title: smsCapture ? "Disable capture" : "Enable capture",
-        message: `Turning ${smsCapture ? "off" : "on"} sms capture`,
+        title: isSmsCapture ? "Disable capture" : "Enable capture",
+        message: `Turning ${isSmsCapture ? "off" : "on"} sms capture`,
         handleClose: handleStatusClose,
         action: {
           callback() {},
         },
       });
-      if (smsCapture) {
-        await stopSMSCapture();
+      if (isSmsCapture) {
+        await updateSmsCaptureState("off");
       } else {
-        await startSMSCapture();
+        await updateSmsCaptureState("on");
       }
-      const isCapture = await isCaptureActive();
-
       setStatus({
         open: true,
         type: "success",
-        message: `SMS capture turned ${smsCapture ? "off" : "on"}`,
+        message: `SMS capture turned ${isSmsCapture ? "off" : "on"}`,
         handleClose: handleStatusClose,
         action: { callback: handleStatusClose },
       });
-      setSmsCapture(isCapture);
-    } catch (error) {
+    } catch (error: any) {
       toastError(error);
       setStatus({
         open: true,
         type: "error",
         message:
-          "An error occured while updating sms capture, please try again",
+          error.cause === 1
+            ? error.message
+            : "An error occured while updating sms capture, please try again",
         handleClose: handleStatusClose,
         action: {
           callback: handleStatusClose,
@@ -291,8 +305,123 @@ const Profile = () => {
     }
   };
 
+  const handleUpdatePin = () => {
+    if (pinProtected) {
+      setPinModal({
+        mode: "enter",
+        onBack() {
+          setPinModal({ mode: "" });
+        },
+        onComplete: () => {
+          setPinModal({
+            mode: "create",
+            onBack() {
+              setPinModal({ mode: "" });
+            },
+            onComplete: () => {
+              setPinModal({ mode: "" });
+              setPinProtected(true);
+            },
+          });
+        },
+      });
+    }else{
+      turnOnPin()
+    }
+  };
+
+  const togglePin = () => {
+    if (pinProtected) {
+      setStatus({
+        open: true,
+        type: "warning",
+        title: "Disable Pin?",
+        message: "You will be able to access the app without unlocking it.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: async () => {
+            try {
+              setStatus({
+                open: true,
+                type: "loading",
+                title: "Removing pin.",
+                message: "Please wait.",
+                handleClose: handleStatusClose,
+                action: {
+                  callback() {},
+                },
+              });
+              await removePin();
+              setPinProtected(false);
+              setStatus({
+                open: true,
+                type: "success",
+                title: "Pin removed",
+                message: "You can now access the app without the pin.",
+                handleClose: handleStatusClose,
+                action: {
+                  callback() {
+                    handleStatusClose();
+                  },
+                },
+              });
+            } catch (error) {
+              setStatus({
+                open: true,
+                type: "error",
+                title: "Error removing pin.",
+                message:
+                  "An error occured while removing pin,please try again.",
+                handleClose: handleStatusClose,
+                action: {
+                  callback: handleStatusClose,
+                },
+              });
+              toastError(error);
+            }
+          },
+        },
+      });
+    } else {
+      turnOnPin();
+    }
+  };
+
+  const turnOnPin = () => {
+    setStatus({
+      open: true,
+      type: "warning",
+      title: "Enable Pin?",
+      message:
+        "You will need to remember your pin to unlock the app, you will loose all your data if you reset the pin.",
+      handleClose: handleStatusClose,
+      action: {
+        callback() {
+          handleStatusClose()
+          setPinModal({
+            mode: "create",
+            onBack() {
+              setPinModal({ mode: "" });
+            },
+            onComplete: () => {
+              setPinModal({ mode: "" });
+              setPinProtected(true);
+            },
+          });
+        },
+      },
+    });
+  };
+
   const handleLink = async () => {
     await openBrowserAsync("https://qwantu.wegahstudios.com/");
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/profile");
+    }, 500);
   };
 
   return (
@@ -314,7 +443,12 @@ const Profile = () => {
             </ThemedText>
           </View>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           <View className=" flex-1 flex-col gap-[30px] pt-[40px] pb-[20px] ">
             <View className=" flex-col gap-[10px] ">
               <ThemedText className=" font-urbanistBold text-[1.2rem] ">
@@ -414,11 +548,60 @@ const Profile = () => {
                       }
                       ios_backgroundColor="#3e3e3e"
                       onValueChange={toggleSmsCapture}
-                      value={smsCapture}
+                      value={isSmsCapture}
                     />
                     <ThemedText>On</ThemedText>
                   </View>
                 </View>
+              </View>
+            </View>
+            <View className=" flex-col gap-[10px] ">
+              <ThemedText className=" font-urbanistBold text-[1.2rem] ">
+                Security
+              </ThemedText>
+              <View className=" flex-col gap-[20px] p-[20px] bg-paper-light rounded-[20px] dark:bg-paper-dark ">
+                <View className=" flex-row justify-between items-center ">
+                  <ThemedText className=" text-[1.1rem] font-urbanistMedium ">
+                    Enable Pin
+                  </ThemedText>
+                  <View className=" flex-row items-center gap-2 ">
+                    <ThemedText>on</ThemedText>
+                    <Switch
+                      trackColor={{
+                        false: tintColors.divider,
+                        true: tintColors.info,
+                      }}
+                      thumbColor={
+                        isDarkTheme
+                          ? tintColors.paper.light
+                          : tintColors.paper.dark
+                      }
+                      ios_backgroundColor="#3e3e3e"
+                      onValueChange={togglePin}
+                      value={pinProtected}
+                    />
+                    <ThemedText>off</ThemedText>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={handleUpdatePin}
+                  className=" flex-row pt-[10px] pb-[10px] justify-between items-center "
+                >
+                  <ThemedText
+                    toggleOnDark={pinProtected}
+                    className={` font-urbanistMedium text-[1.2rem] ${
+                      !pinProtected ? "text-divider" : ""
+                    } `}
+                  >
+                    {pinProtected ? "Update" : "Set"} pin
+                  </ThemedText>
+                  <ThemedIcon
+                    toggleOnDark={pinProtected}
+                    source={icons.lock}
+                    className={` w-[15px] h-[15px]`}
+                    tintColor={!pinProtected ? tintColors.divider : undefined}
+                  />
+                </Pressable>
               </View>
             </View>
             <View className=" flex-col gap-[10px] ">

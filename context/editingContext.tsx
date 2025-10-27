@@ -4,26 +4,44 @@ import EditExpense from "@/components/edit/expense";
 import ParseMessages from "@/components/edit/messages";
 import AddExpenseModal from "@/components/expenses/addExpenseModal";
 import FeedbackModal from "@/components/feedbackModal";
-import SmsCaptureModal from "@/components/smsCaptureModal";
+import PinModal from "@/components/pinModal";
+import SmsCaptureModal from "@/components/smsRequestModal";
 import StatusModal from "@/components/statusModal";
 import { tintColors } from "@/constants/colorSettings";
-import { EditingContextProps, SmsCaptureMode, Status } from "@/types/common";
+import { toastError } from "@/lib/appUtils";
+import { handleSmsEvent, importFromSMSListener } from "@/lib/expenseUtils";
+import { EditingContextProps, Status } from "@/types/common";
 import BottomSheet from "@gorhom/bottom-sheet";
+import { router, useLocalSearchParams, usePathname } from "expo-router";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import { Keyboard } from "react-native";
+import { AppState, Keyboard, ToastAndroid } from "react-native";
+import {
+  addOnMessageCapturedListener,
+  clearStoredReceipts,
+  deleteReceipt,
+  getStoredReceipts,
+} from "react-native-sms-listener";
+import { useCustomThemeContext } from "./themeContext";
 
 const EditingContext = createContext<{
   open: (props: EditingContextProps) => void;
   close: () => void;
-  isSmsCaptureModal: boolean;
+  showPathInfo: boolean;
   setStatus: React.Dispatch<React.SetStateAction<Status>>;
+  setPinModal: React.Dispatch<
+    React.SetStateAction<{
+      mode: "enter" | "create" | "";
+      onComplete?: () => void;
+      onBack?: () => void;
+    }>
+  >;
   setAddExpenseModal: React.Dispatch<React.SetStateAction<boolean>>;
   setFeedbackModal: React.Dispatch<React.SetStateAction<boolean>>;
   handleStatusClose: () => void;
@@ -44,6 +62,11 @@ export const EditingContexProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
+  const pathname = usePathname();
+  const params = useLocalSearchParams();
+
+  const { smsCaptureState, updateSmsCaptureState, pinProtected } =
+    useCustomThemeContext();
   const [addExpenseModal, setAddExpenseModal] = useState<boolean>(false);
   const [feedbackModal, setFeedbackModal] = useState<boolean>(false);
   const [status, setStatus] = useState<Status>({
@@ -59,27 +82,137 @@ export const EditingContexProvider = ({
     type: "",
     snapPoints: ["75%"],
   });
-  const [smsCaptureModal, setSmsCaptureModal] = useState<SmsCaptureMode>({
-    open: false,
-    type: "loading",
-  });
-  const [smsChecked, setSmsChecked] = useState<boolean>(false);
-  const isSmsCaptureModal = useMemo(
-    () => smsCaptureModal.open,
-    [smsCaptureModal.open]
-  );
+  const [smsRequestModal, setSmsRequestModal] = useState<boolean>(false);
+  const [initialCheck, setInitialCheck] = useState<boolean>(false);
+  const [pinModal, setPinModal] = useState<{
+    mode: "enter" | "create" | "";
+    onComplete?: () => void;
+    onBack?: () => void;
+  }>({ mode: "" });
+
+  const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
+
   useEffect(() => {
-    if (!smsChecked) {
-      setSmsCaptureModal({
-        open: true,
-        type: "loading",
-        fetchMessages: true,
-      });
-      setSmsChecked(true);
+    if (!initialCheck) {
+      handleOnStart(true);
+      setInitialCheck(true);
     }
-  }, [smsChecked]);
+  }, [initialCheck]);
+
+  useEffect(() => {
+    const appSub = AppState.addEventListener("change", (nextState) => {
+      console.log("app state changeD: ", nextState);
+      ToastAndroid.show(`App state: ${nextState}`, ToastAndroid.SHORT);
+      if (nextState === "active") {
+        console.log("yeah this is it.");
+        handleOnStart();
+      }
+    });
+    return appSub.remove();
+  }, []);
+
+  const handleSmsCapture = useCallback(
+    async (requestIfNull?: boolean) => {
+      if (smsCaptureState === "on") {
+        addOnMessageCapturedListener((message) => {
+          const onSmsEvent = async () => {
+            try {
+              console.log("event happend without you");
+              await handleSmsEvent(message);
+              await deleteReceipt(message.id);
+              ToastAndroid.show(
+                "New expense added, reload to see changes",
+                ToastAndroid.LONG
+              );
+            } catch (error) {
+              toastError(error, "An error occured while adding new expense");
+            }
+          };
+          onSmsEvent();
+        });
+        await fetchMessages();
+        setShowPathInfo(true);
+      } else if (smsCaptureState === null && requestIfNull) {
+        setSmsRequestModal(true);
+      }
+    },
+    [smsCaptureState]
+  );
+
+  const handleOnStart = useCallback(
+    async (requestIfNull?: boolean) => {
+      setShowPathInfo(false);
+      if (pinProtected) {
+        setPinModal({
+          mode: "enter",
+          onComplete() {
+            setPinModal({ mode: "" });
+            handleSmsCapture(requestIfNull);
+          },
+        });
+      } else {
+        handleSmsCapture(requestIfNull);
+      }
+    },
+    [pinProtected]
+  );
 
   const ref = useRef<BottomSheet>(null);
+
+  const fetchMessages = async () => {
+    try {
+      ToastAndroid.show(`Fetched messages.`, ToastAndroid.SHORT);
+      setStatus({
+        open: true,
+        type: "loading",
+        message: "Checking for new messages.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+      const messages = await getStoredReceipts();
+      if (messages.length) {
+        setStatus({
+          open: true,
+          type: "loading",
+          message: `Importing ${messages.length} new messages, please wait.`,
+          handleClose: handleStatusClose,
+          action: {
+            callback: handleStatusClose,
+          },
+        });
+        const expenses = await importFromSMSListener(messages);
+        await clearStoredReceipts();
+        setStatus({
+          open: true,
+          type: "success",
+          title: "New expenses added",
+          message: `${expenses.length} new expenses added.`,
+          handleClose: handleStatusClose,
+          action: {
+            callback: () => {
+              router.replace({ pathname: pathname as any, params });
+              handleStatusClose();
+            },
+          },
+        });
+      } else {
+        handleStatusClose();
+      }
+    } catch (error) {
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          "An error occured while checking for new expenses, please try again.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+    }
+  };
 
   const open = (props: EditingContextProps) => {
     setProps({ ...props, close, setStatus, handleStatusClose });
@@ -111,13 +244,61 @@ export const EditingContexProvider = ({
       },
     });
   };
+
+  const handleSmsRequestSubmit = async () => {
+    setSmsRequestModal(false);
+    try {
+      setStatus({
+        open: true,
+        type: "loading",
+        message: "Enabling automating expense capture.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+      await updateSmsCaptureState("on");
+      setStatus({
+        open: true,
+        type: "success",
+        title: "Automatic Capture enabled",
+        message: "Automatic expense capture is now ebabled.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+    } catch (error: any) {
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          error.cause === 1
+            ? error.message
+            : "An error occured while enabling auto expense capture.",
+        handleClose: handleStatusClose,
+        action: { callback: handleStatusClose },
+      });
+    }
+    setShowPathInfo(true);
+  };
+
+  const handleSmsRequestClose = async (dnd: boolean) => {
+    if (dnd) {
+      await updateSmsCaptureState("dnd");
+    }
+    setSmsRequestModal(false);
+    setShowPathInfo(true);
+  };
+
   return (
     <EditingContext.Provider
       value={{
         open,
         close,
-        isSmsCaptureModal,
+        showPathInfo,
         setStatus,
+        setPinModal,
         handleStatusClose,
         setAddExpenseModal,
         setFeedbackModal,
@@ -141,7 +322,12 @@ export const EditingContexProvider = ({
         open={feedbackModal}
         handleClose={() => setFeedbackModal(false)}
       />
-      <SmsCaptureModal mode={smsCaptureModal} setMode={setSmsCaptureModal} />
+      <SmsCaptureModal
+        open={smsRequestModal}
+        handleClose={handleSmsRequestClose}
+        handleSubmit={handleSmsRequestSubmit}
+      />
+      <PinModal {...{ ...pinModal, setStatus, handleStatusClose }} />
       <AddExpenseModal
         open={addExpenseModal}
         openEditSheet={open}

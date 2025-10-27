@@ -11,7 +11,14 @@ import { deleteBudgets, getBudgets } from "@/lib/budgetUtils";
 import { Budget } from "@/types/common";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  TextInput,
+  View,
+} from "react-native";
 import * as Progress from "react-native-progress";
 
 const Budgets = () => {
@@ -32,6 +39,7 @@ const Budgets = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [canGoNext, setCanGoNext] = useState<boolean>(false);
   const allSelected = useMemo<boolean>(
@@ -155,7 +163,7 @@ const Budgets = () => {
 
   const handleItemEdit = (index: number) => {
     open({
-      mode:"edit",
+      mode: "edit",
       type: "budgets",
       snapPoints: ["80%"],
       budget: budgets[index],
@@ -257,6 +265,13 @@ const Budgets = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/budgets");
+    }, 500);
+  };
+
   return (
     <View className=" flex-1 ">
       <View className=" pt-[10px] pb-[10px] flex-col gap-[20px] ">
@@ -332,6 +347,9 @@ const Budgets = () => {
       {!!budgets.length ? (
         <FlatList
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           data={budgets}
           ListFooterComponent={() => (
             <View className=" p-[10px] flex-row items-center justify-center ">

@@ -4,11 +4,19 @@ import SelectAction from "@/components/expenses/selectAction";
 import ThemedText from "@/components/textThemed";
 import ThemedIcon from "@/components/themedIcon";
 import icons from "@/constants/icons";
+import { useEditingContext } from "@/context/editingContext";
 import { useAppProps } from "@/context/propContext";
+import { toastError } from "@/lib/appUtils";
 import { createCollection, deleteCollections } from "@/lib/collectionsUtils";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
 import * as Progress from "react-native-progress";
 
 const Collections = () => {
@@ -26,6 +34,9 @@ const Collections = () => {
     >;
   };
 
+  const { setStatus, handleStatusClose } = useEditingContext();
+
+  const [refreshing, setRefreshing] = useState(false);
   const [expand, setExpand] = useState<boolean>(false);
   const [addMode, setAddMode] = useState<boolean>(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -99,10 +110,45 @@ const Collections = () => {
   };
 
   const handleDelete = async () => {
-    const result = await deleteCollections(selected, collections);
-    setCollections(result);
-    setSelectMode(false);
-    setSelected(new Set());
+    try {
+      setStatus({
+        open: true,
+        type: "loading",
+        title: "Deleting collections",
+        message: "please wait",
+        handleClose: handleStatusClose,
+        action: { callback() {} },
+      });
+      const result = await deleteCollections(selected, collections);
+      setCollections(result);
+      setSelectMode(false);
+      setSelected(new Set());
+      setStatus({
+        open: true,
+        type: "success",
+        title: "Collections deleted",
+        message: "The selected collections have been deleted",
+        handleClose: handleStatusClose,
+        action: { callback: handleStatusClose },
+      });
+    } catch (error) {
+      toastError(error);
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          "An error occured while deleting collections, please try again.",
+        handleClose: handleStatusClose,
+        action: { callback: handleStatusClose },
+      });
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/expenses/collections");
+    }, 500);
   };
 
   return (
@@ -145,7 +191,12 @@ const Collections = () => {
             </View>
           )}
         </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           {loading ? (
             <View className=" flex-1 flex-col items-center justify-center gap-[20px] ">
               <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />

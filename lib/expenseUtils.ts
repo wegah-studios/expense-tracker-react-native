@@ -1,6 +1,7 @@
 import db from "@/db/schema";
 import { DictionaryItem, Expense } from "@/types/common";
 import { nanoid } from "nanoid/non-secure";
+import { deleteReceipt } from "react-native-sms-listener";
 import * as XLSX from "xlsx";
 import { normalizeString } from "./appUtils";
 import { updateBudgets } from "./budgetUtils";
@@ -664,4 +665,11 @@ export const importFromSMSListener = async (messages: string[]) => {
     await Promise.all(promises);
   });
   return expenses;
+};
+
+export const handleSmsEvent = async (message: { id: number; body: string }) => {
+  const expenses: Partial<Expense>[] = [];
+  await handleMessage(message.body, expenses);
+  await deleteReceipt(message.id);
+  return expenses[0];
 };

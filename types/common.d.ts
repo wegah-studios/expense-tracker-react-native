@@ -170,11 +170,3 @@ export type EditingContextProps = Record<string, any> & {
   snapPoints: string[];
   onClose?: () => void;
 };
-
-export type SmsCaptureMode = {
-  open: boolean;
-  type: "loading" | "request" | "success" | "error";
-  title?: string;
-  message?: string;
-  fetchMessages?:boolean
-};

@@ -3,11 +3,12 @@ import HomeStatisticsWidget from "@/components/home/statisticsWidget";
 import ThemedText from "@/components/textThemed";
 import ThemedIcon from "@/components/themedIcon";
 import icons from "@/constants/icons";
-import { Link } from "expo-router";
-import { useMemo } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Link, router } from "expo-router";
+import { useMemo, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 
 const Home = () => {
+  const [refreshing, setRefreshing] = useState(false);
   const greeting = useMemo(() => {
     const date = new Date();
     return date.getHours() >= 18
@@ -16,6 +17,13 @@ const Home = () => {
       ? "Afternoon"
       : "Morning";
   }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/");
+    }, 500);
+  };
 
   return (
     <View className=" flex-1">
@@ -50,7 +58,12 @@ const Home = () => {
           </Link>
         </View>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         <View className=" flex-1 flex-col gap-[30px] pt-[20px] pb-[30px]">
           <HomeStatisticsWidget />
           <HomeExpenseWidget />

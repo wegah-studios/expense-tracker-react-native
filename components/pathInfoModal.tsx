@@ -28,12 +28,7 @@ const PathInfoModal = () => {
         {
           icon: icons.logo,
           title: `Send Feedback`,
-          description: `This is the early release version of the app, meaning the app is less than 50% complete, there are multiple features and updates that are to come. Go to preferences and tap "Send feedback" to notify us of any issues or improvements with the app.`,
-        },
-        {
-          icon: icons.logo,
-          title: `Get started`,
-          description: `To get started press the "+" button to import expenses into the app. Press the "?" button for help. `,
+          description: `This is the early release version of the app, there are multiple features and updates that are to come. Go to preferences and tap "Send feedback" to notify us of any issues or improvements. Press the "?" button for help.`,
         },
       ],
       "/expenses/collections": [
@@ -57,18 +52,11 @@ const PathInfoModal = () => {
           description: `The Budgets tab allows you to add and view multiple budgets and keep track of how much you've spent for each. Tap a budget for more info`,
         },
       ],
-      "/profile": [
-        {
-          icon: icons.settings,
-          title: `Prefrences`,
-          description: `One of the most powerfull features can be found in the preferences page, the dictionary allows you to automatically set the title and/or the category of expenses imported from mpesa receipts using keywords or exact matches. Go to prefrences and Tap "My dictionary" for more info. `,
-        },
-      ],
     }),
     []
   );
 
-  const { isSmsCaptureModal } = useEditingContext();
+  const { showPathInfo } = useEditingContext();
   const pathname = usePathname();
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<boolean>(false);
@@ -90,24 +78,28 @@ const PathInfoModal = () => {
   >(() => info[step], [info, step]);
 
   useEffect(() => {
-    if (content[pathname] && !seen.has(pathname) && !isSmsCaptureModal) {
-      const fetchPreferences = async () => {
-        const preferences = await getPreferences(pathname);
-        let currentStep = 0;
-        if (preferences[pathname] !== undefined) {
-          currentStep = Number(preferences[pathname]);
-        }
-        if (currentStep !== -1) {
-          setInfo(content[pathname]);
-          setStep(currentStep);
-          setOpen(true);
-        } else {
-          addPathnameToSeen();
-        }
-      };
-      fetchPreferences();
+    if (!showPathInfo) {
+      setOpen(false);
+    } else {
+      if (content[pathname] && !seen.has(pathname)) {
+        const fetchPreferences = async () => {
+          const preferences = await getPreferences(pathname);
+          let currentStep = 0;
+          if (preferences[pathname] !== undefined) {
+            currentStep = Number(preferences[pathname]);
+          }
+          if (currentStep !== -1) {
+            setInfo(content[pathname]);
+            setStep(currentStep);
+            setOpen(true);
+          } else {
+            addPathnameToSeen();
+          }
+        };
+        fetchPreferences();
+      }
     }
-  }, [pathname, isSmsCaptureModal]);
+  }, [pathname, showPathInfo]);
 
   const handleClose = () => {
     try {

@@ -13,7 +13,14 @@ import {
 import { DictionaryItem, DictionaryItemType } from "@/types/common";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  TextInput,
+  View,
+} from "react-native";
 import * as Progress from "react-native-progress";
 
 const DictionaryItems = () => {
@@ -22,6 +29,7 @@ const DictionaryItems = () => {
 
   const [items, setItems] = useState<DictionaryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState<number>(1);
   const [search, setSearch] = useState<string>("");
   const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
@@ -216,7 +224,7 @@ const DictionaryItems = () => {
       await deleteDictionaryItems(selected, type);
       setItems((prev) => prev.filter((item) => !selected.has(item.id)));
       resetSelected();
-      handleStatusClose()
+      handleStatusClose();
     } catch (error) {
       toastError(error);
       setStatus({
@@ -234,6 +242,13 @@ const DictionaryItems = () => {
   const handleSearchClear = () => {
     setSearch("");
     fetchItems({ search: "" });
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace("/dictionary/items");
+    }, 500);
   };
 
   return (
@@ -310,6 +325,9 @@ const DictionaryItems = () => {
       </View>
       {!!items.length ? (
         <FlatList
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           showsVerticalScrollIndicator={false}
           data={items}
           renderItem={({ item, index }) => (

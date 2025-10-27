@@ -6,6 +6,7 @@ const icons = {
   add: require("../assets/images/add.png"),
   avatar: require("../assets/images/avatar.png"),
   collection: require("../assets/images/add-folder.png"),
+  backspace: require("../assets/images/backspace.png"),
   budgets: {
     filled: require("../assets/images/budget-filled.png"),
     outlined: require("../assets/images/budget-outlined.png"),

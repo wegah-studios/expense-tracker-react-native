@@ -20,6 +20,7 @@ import {
   Image,
   Platform,
   Pressable,
+  RefreshControl,
   SectionList,
   TextInput,
   ToastAndroid,
@@ -59,6 +60,7 @@ const Collection = () => {
     [selected, expenseIndicies]
   );
 
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
@@ -368,6 +370,16 @@ const Collection = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace({
+        pathname: "/expenses/collection",
+        params: { collection, filter },
+      });
+    }, 500);
+  };
+
   return (
     <>
       <View className=" flex-1 ">
@@ -476,6 +488,12 @@ const Collection = () => {
           <SectionList
             sections={sections}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+              />
+            }
             renderItem={({ item, section }) =>
               !!expenses[item] && (
                 <ExpenseCard

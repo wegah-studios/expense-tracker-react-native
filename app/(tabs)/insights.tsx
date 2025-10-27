@@ -4,6 +4,7 @@ import ThemedText from "@/components/textThemed";
 import ThemedIcon from "@/components/themedIcon";
 import { colorCycle, tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
+import { useEditingContext } from "@/context/editingContext";
 import { formatAmount } from "@/lib/appUtils";
 import {
   fetchPathInfo,
@@ -15,7 +16,14 @@ import {
 import { Statistic, StatisticOption, StatisticPath } from "@/types/common";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, ScrollView, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
 import * as Progress from "react-native-progress";
 
 const Statistics = () => {
@@ -24,6 +32,8 @@ const Statistics = () => {
     labelPath?: string;
     paramOptions?: string;
   };
+  const { setAddExpenseModal } = useEditingContext();
+
   const [loading, setLoading] = useState<{
     statistics: boolean;
     options: boolean;
@@ -32,6 +42,7 @@ const Statistics = () => {
 
   const [canGoNext, setCanGoNext] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [paths, setPaths] = useState<StatisticPath[]>([]);
   const [options, setOptions] = useState<StatisticOption[][]>([]);
@@ -214,7 +225,19 @@ const Statistics = () => {
     }
   };
 
-  const handleAddExpense = () => {};
+  const handleAddExpense = () => {
+    setAddExpenseModal(true);
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      router.replace({
+        pathname: "/insights",
+        params: { timePath, labelPath, paramOptions },
+      });
+    }, 500);
+  };
 
   return (
     <View className=" mt-[5px] flex-1 flex-col gap-[20px] ">
@@ -271,6 +294,9 @@ const Statistics = () => {
       ) : (
         <FlatList
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
           ItemSeparatorComponent={() => <View className=" p-[10px] "></View>}
           ListFooterComponent={() => (
             <View className=" p-[10px] flex-row items-center justify-center ">
