@@ -5,7 +5,7 @@ import ParseMessages from "@/components/edit/messages";
 import AddExpenseModal from "@/components/expenses/addExpenseModal";
 import FeedbackModal from "@/components/feedbackModal";
 import PinModal from "@/components/pinModal";
-import SmsCaptureModal from "@/components/smsRequestModal";
+import SmsRequestModal from "@/components/smsRequestModal";
 import StatusModal from "@/components/statusModal";
 import { tintColors } from "@/constants/colorSettings";
 import { toastError } from "@/lib/appUtils";
@@ -88,7 +88,6 @@ export const EditingContexProvider = ({
     snapPoints: ["75%"],
   });
   const [smsRequestModal, setSmsRequestModal] = useState<boolean>(false);
-  const [initialCheck, setInitialCheck] = useState<boolean>(false);
   const [pinModal, setPinModal] = useState<{
     mode: "enter" | "create" | "";
     onComplete?: () => void;
@@ -96,82 +95,67 @@ export const EditingContexProvider = ({
   }>({ mode: "" });
 
   const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
+  const [smsRequested, setSmsRequested] = useState<boolean>(false);
   const [smsSubScription, setSmsSubscription] =
     useState<NativeEventSubscription>();
 
   useEffect(() => {
-    if (!initialCheck) {
-      handleOnStart(true);
-      setInitialCheck(true);
-    }
-  }, [initialCheck]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
-      ToastAndroid.show(`App state: ${nextAppState}`, ToastAndroid.LONG);
-      console.log("App state changed:", nextAppState);
       if (nextAppState === "active") {
-        console.log("yeah this is it.");
-        handleOnStart();
+        handleOnActive();
       }
     });
 
     return () => subscription.remove();
   }, []);
 
-  const handleSmsCapture = useCallback(
-    async (requestIfNull?: boolean) => {
-      if (smsCaptureState === "on") {
-        setSmsSubscription((prev) => {
-          prev?.remove()
-          return addOnMessageCapturedListener((message) => {
-            const onSmsEvent = async () => {
-              try {
-                await handleSmsEvent(message);
-                await deleteReceipt(message.id);
-                ToastAndroid.show(
-                  "New expense added, reload to see changes",
-                  ToastAndroid.LONG
-                );
-              } catch (error) {
-                toastError(error, "An error occured while adding new expense");
-              }
-            };
-            onSmsEvent();
-          });
+  const handleSmsCapture = useCallback(async () => {
+    if (smsCaptureState === "on") {
+      setSmsSubscription((prev) => {
+        prev?.remove();
+        return addOnMessageCapturedListener((message) => {
+          const onSmsEvent = async () => {
+            try {
+              await handleSmsEvent(message);
+              await deleteReceipt(message.id);
+              ToastAndroid.show(
+                "New expense added, reload to see changes",
+                ToastAndroid.LONG
+              );
+            } catch (error) {
+              toastError(error, "An error occured while adding new expense");
+            }
+          };
+          onSmsEvent();
         });
-        await fetchMessages();
-        setShowPathInfo(true);
-      } else if (smsCaptureState === null && requestIfNull) {
-        setSmsRequestModal(true);
-      }
-    },
-    [smsCaptureState]
-  );
+      });
+      await fetchMessages();
+      setShowPathInfo(true);
+    } else if (smsCaptureState === null && !smsRequested) {
+      setSmsRequestModal(true);
+      setSmsRequested(true);
+    }
+  }, [smsCaptureState, smsRequested]);
 
-  const handleOnStart = useCallback(
-    async (requestIfNull?: boolean) => {
-      setShowPathInfo(false);
-      if (pinProtected) {
-        setPinModal({
-          mode: "enter",
-          onComplete() {
-            setPinModal({ mode: "" });
-            handleSmsCapture(requestIfNull);
-          },
-        });
-      } else {
-        handleSmsCapture(requestIfNull);
-      }
-    },
-    [pinProtected]
-  );
+  const handleOnActive = useCallback(async () => {
+    setShowPathInfo(false);
+    if (pinProtected) {
+      setPinModal({
+        mode: "enter",
+        onComplete() {
+          setPinModal({ mode: "" });
+          handleSmsCapture();
+        },
+      });
+    } else {
+      handleSmsCapture();
+    }
+  }, [pinProtected]);
 
   const ref = useRef<BottomSheet>(null);
 
   const fetchMessages = async () => {
     try {
-      ToastAndroid.show(`Fetched messages.`, ToastAndroid.SHORT);
       setStatus({
         open: true,
         type: "loading",
@@ -275,7 +259,10 @@ export const EditingContexProvider = ({
         message: "Automatic expense capture is now ebabled.",
         handleClose: handleStatusClose,
         action: {
-          callback: handleStatusClose,
+          callback: () => {
+            handleStatusClose();
+            setShowPathInfo(true);
+          },
         },
       });
     } catch (error: any) {
@@ -290,12 +277,25 @@ export const EditingContexProvider = ({
         action: { callback: handleStatusClose },
       });
     }
-    setShowPathInfo(true);
   };
 
   const handleSmsRequestClose = async (dnd: boolean) => {
     if (dnd) {
-      await updateSmsCaptureState("dnd");
+      try {
+        setStatus({
+          open: true,
+          type: "loading",
+          message: "please wait.",
+          handleClose: handleStatusClose,
+          action: {
+            callback: handleStatusClose,
+          },
+        });
+        await updateSmsCaptureState("dnd");
+        handleStatusClose();
+      } catch (error) {
+        toastError(error);
+      }
     }
     setSmsRequestModal(false);
     setShowPathInfo(true);
@@ -332,7 +332,7 @@ export const EditingContexProvider = ({
         open={feedbackModal}
         handleClose={() => setFeedbackModal(false)}
       />
-      <SmsCaptureModal
+      <SmsRequestModal
         open={smsRequestModal}
         handleClose={handleSmsRequestClose}
         handleSubmit={handleSmsRequestSubmit}

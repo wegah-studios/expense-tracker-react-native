@@ -17,8 +17,8 @@ const PathInfoModal = () => {
       "/": [
         {
           icon: icons.logo,
-          title: `Welcome to Expense tracker for M-pesa.`,
-          description: `The app captures expenses and allows you to accurately track your spending, it also stores the statistics of each expense and tracks budgets for you and much more.`,
+          title: `Welcome to Qwantu - Expense tracker`,
+          description: `The app captures expenses and allows you to accurately track your spending, it also has insights and tracks budgets for you and much more.`,
         },
         {
           icon: icons.logo,
@@ -28,7 +28,7 @@ const PathInfoModal = () => {
         {
           icon: icons.logo,
           title: `Send Feedback`,
-          description: `This is the early release version of the app, there are multiple features and updates that are to come. Go to preferences and tap "Send feedback" to notify us of any issues or improvements. Press the "?" button for help.`,
+          description: `This is the early release version of the app, there are multiple features and updates that are to come. Long Press the "?" button to send feedback or press it once for help.`,
         },
       ],
       "/expenses/collections": [
@@ -42,7 +42,7 @@ const PathInfoModal = () => {
         {
           icon: icons.insights.filled,
           title: `Insights`,
-          description: `The insights tab allows you to view key information of all your expenses.`,
+          description: `The insights tab allows you to view key information and trends of all your expenses.`,
         },
       ],
       "/budgets": [

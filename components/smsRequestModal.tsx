@@ -4,7 +4,7 @@ import { Modal, Pressable, View } from "react-native";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
 
-const SmsCaptureModal = ({
+const SmsRequestModal = ({
   open,
   handleClose,
   handleSubmit,
@@ -74,4 +74,4 @@ const SmsCaptureModal = ({
   );
 };
 
-export default SmsCaptureModal;
+export default SmsRequestModal;

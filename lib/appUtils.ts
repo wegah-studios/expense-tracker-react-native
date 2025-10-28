@@ -184,7 +184,7 @@ export const sendFeedback = async (feedback: {
 
   await MailComposer.composeAsync({
     recipients: ["wegahstudios@gmail.com"],
-    subject: "Expense tracker Feedback 🗣️",
+    subject: "Qwantu app Feedback 🗣️",
     body,
     attachments: [logsZip],
   });
