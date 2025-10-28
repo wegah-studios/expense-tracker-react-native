@@ -21,7 +21,12 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState, Keyboard, ToastAndroid } from "react-native";
+import {
+  AppState,
+  Keyboard,
+  NativeEventSubscription,
+  ToastAndroid,
+} from "react-native";
 import {
   addOnMessageCapturedListener,
   clearStoredReceipts,
@@ -91,6 +96,8 @@ export const EditingContexProvider = ({
   }>({ mode: "" });
 
   const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
+  const [smsSubScription, setSmsSubscription] =
+    useState<NativeEventSubscription>();
 
   useEffect(() => {
     if (!initialCheck) {
@@ -100,35 +107,38 @@ export const EditingContexProvider = ({
   }, [initialCheck]);
 
   useEffect(() => {
-    const appSub = AppState.addEventListener("change", (nextState) => {
-      console.log("app state changeD: ", nextState);
-      ToastAndroid.show(`App state: ${nextState}`, ToastAndroid.SHORT);
-      if (nextState === "active") {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      ToastAndroid.show(`App state: ${nextAppState}`, ToastAndroid.LONG);
+      console.log("App state changed:", nextAppState);
+      if (nextAppState === "active") {
         console.log("yeah this is it.");
         handleOnStart();
       }
     });
-    return appSub.remove();
+
+    return () => subscription.remove();
   }, []);
 
   const handleSmsCapture = useCallback(
     async (requestIfNull?: boolean) => {
       if (smsCaptureState === "on") {
-        addOnMessageCapturedListener((message) => {
-          const onSmsEvent = async () => {
-            try {
-              console.log("event happend without you");
-              await handleSmsEvent(message);
-              await deleteReceipt(message.id);
-              ToastAndroid.show(
-                "New expense added, reload to see changes",
-                ToastAndroid.LONG
-              );
-            } catch (error) {
-              toastError(error, "An error occured while adding new expense");
-            }
-          };
-          onSmsEvent();
+        setSmsSubscription((prev) => {
+          prev?.remove()
+          return addOnMessageCapturedListener((message) => {
+            const onSmsEvent = async () => {
+              try {
+                await handleSmsEvent(message);
+                await deleteReceipt(message.id);
+                ToastAndroid.show(
+                  "New expense added, reload to see changes",
+                  ToastAndroid.LONG
+                );
+              } catch (error) {
+                toastError(error, "An error occured while adding new expense");
+              }
+            };
+            onSmsEvent();
+          });
         });
         await fetchMessages();
         setShowPathInfo(true);
