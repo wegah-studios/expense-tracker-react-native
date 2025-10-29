@@ -264,7 +264,8 @@ export const updateExpense = async (
       )}) VALUES ( ?${", ?".repeat(keys.length - 1)})`;
       params = values;
 
-      if (expense.collection) {
+      promises.push(addToCollection("expenses"));
+      if (expense.collection && expense.collection !== "expenses") {
         promises.push(addToCollection(expense.collection));
       }
     }

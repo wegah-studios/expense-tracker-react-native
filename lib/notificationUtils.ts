@@ -16,7 +16,7 @@ export const addNotification = async (notification: Partial<Notification>) => {
   const values = Object.values(notification);
 
   notification.id = nanoid();
-  notification.unread = true;
+  notification.unread = 1;
   await db.runAsync(
     `INSERT INTO notifications (${keys.join(", ")}) VALUES (?${`, ?`.repeat(
       keys.length - 1

@@ -565,7 +565,7 @@ const Profile = () => {
                     Enable Pin
                   </ThemedText>
                   <View className=" flex-row items-center gap-2 ">
-                    <ThemedText>on</ThemedText>
+                    <ThemedText>On</ThemedText>
                     <Switch
                       trackColor={{
                         false: tintColors.divider,
@@ -580,7 +580,7 @@ const Profile = () => {
                       onValueChange={togglePin}
                       value={pinProtected}
                     />
-                    <ThemedText>off</ThemedText>
+                    <ThemedText>Off</ThemedText>
                   </View>
                 </View>
                 <Pressable

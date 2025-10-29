@@ -1,7 +1,7 @@
 import { openDatabaseSync } from "expo-sqlite";
 
 const db = openDatabaseSync("app.db");
-const DB_INTEGRITY = `d142b37bd786a9868e4c6eff5e173e3229d3b5591198ddb498345e59c2eb807d`;
+export const DB_INTEGRITY = `d142b37bd786a9868e4c6eff5e173e3229d3b5591198ddb498345e59c2eb807d`;
 
 const date = new Date();
 
@@ -80,8 +80,12 @@ export const schema = `
       title TEXT,
       message TEXT,
       date TEXT,
-      unread BOOLEAN
-      );`;
+      unread INTEGER
+      );
+
+      INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("1", "info", "/dictionary/main", "Automatically label expenses", "View your dictionary and assign labels to expenses.", "${date.toISOString()}", 1);
+      INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("2", "info", "/profile", "Secure your expenses", "Setup a pin to restrict access to your expenses.", "${date.toISOString()}", 1);
+      `;
 
 export const initDB = async () => {
   await db.execAsync(schema);

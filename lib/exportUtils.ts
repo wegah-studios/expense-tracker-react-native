@@ -1,4 +1,4 @@
-import db, { schema } from "@/db/schema";
+import db, { DB_INTEGRITY, schema } from "@/db/schema";
 import { Expense, ManifestEntry } from "@/types/common";
 import CryptoJS from "crypto-js";
 import dayjs from "dayjs";
@@ -13,7 +13,7 @@ import XLSX from "xlsx";
 import { parseExcelFile, parsePdfText } from "./expenseUtils";
 import { requestMediaLibraryPermissions } from "./imageUtils";
 
-const INTEGRITY_HASH = CryptoJS.SHA256(schema).toString(CryptoJS.enc.Hex);
+const INTEGRITY_HASH = DB_INTEGRITY
 const IMAGES_PATH = `${FileSystem.documentDirectory}images`;
 const EXPORTS_PATH = `${FileSystem.cacheDirectory}exports`;
 const IMPORTS_PATH = `${FileSystem.cacheDirectory}imports`;

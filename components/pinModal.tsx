@@ -41,7 +41,6 @@ const PinModal = ({
     if (pin.length >= 4) {
       const handleVerify = async () => {
         try {
-          setPin("");
           setStatus({
             open: true,
             type: "loading",
@@ -63,13 +62,15 @@ const PinModal = ({
               action: {
                 callback() {
                   handleStatusClose();
+                  setPin("");
                   setState("")
                   onComplete && onComplete();
                 },
               },
             });
           } else if (mode === "enter") {
-            const verified = verifyPin(pin);
+            const verified = await verifyPin(pin);
+            setPin("");
             if (!verified) {
               setState("error");
               setStatus({

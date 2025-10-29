@@ -143,7 +143,7 @@ export type Notification = {
   title: string;
   message: string;
   date: string;
-  unread: boolean;
+  unread: 1 | 0;
 };
 
 export type Collection = {

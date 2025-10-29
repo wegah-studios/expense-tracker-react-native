@@ -49,6 +49,7 @@ const AddExpenseModal = ({
           } else {
             router.replace(path);
           }
+          handleStatusClose();
         },
       },
     });
@@ -135,10 +136,8 @@ const AddExpenseModal = ({
       let data: Partial<Expense>[] = [];
       if (fileModal.type === "excel") {
         data = await importExpenses(uri);
-        handleStatusClose();
       } else if (fileModal.type === "pdf") {
         data = await importStatement(uri);
-        handleStatusClose();
       }
       if (!data.length) {
         toastError(

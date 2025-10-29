@@ -95,9 +95,16 @@ export const EditingContexProvider = ({
   }>({ mode: "" });
 
   const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
-  const [smsRequested, setSmsRequested] = useState<boolean>(false);
+  const [initialCheck, setInitialCheck] = useState<boolean>(false);
   const [smsSubScription, setSmsSubscription] =
     useState<NativeEventSubscription>();
+
+  useEffect(() => {
+    if (!initialCheck) {
+      handleStart();
+      setInitialCheck(true);
+    }
+  }, [initialCheck]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
@@ -109,50 +116,57 @@ export const EditingContexProvider = ({
     return () => subscription.remove();
   }, []);
 
-  const handleSmsCapture = useCallback(async () => {
-    if (smsCaptureState === "on") {
-      setSmsSubscription((prev) => {
-        prev?.remove();
-        return addOnMessageCapturedListener((message) => {
-          const onSmsEvent = async () => {
-            try {
-              await handleSmsEvent(message);
-              await deleteReceipt(message.id);
-              ToastAndroid.show(
-                "New expense added, reload to see changes",
-                ToastAndroid.LONG
-              );
-            } catch (error) {
-              toastError(error, "An error occured while adding new expense");
-            }
-          };
-          onSmsEvent();
+  const handleSmsCapture = useCallback(
+    async (requestIfNull?: boolean) => {
+      if (smsCaptureState === "on") {
+        setSmsSubscription((prev) => {
+          prev?.remove();
+          return addOnMessageCapturedListener((message) => {
+            const onSmsEvent = async () => {
+              try {
+                await handleSmsEvent(message);
+                await deleteReceipt(message.id);
+                ToastAndroid.show(
+                  "New expense added, reload to see changes",
+                  ToastAndroid.LONG
+                );
+              } catch (error) {
+                toastError(error, "An error occured while adding new expense");
+              }
+            };
+            onSmsEvent();
+          });
         });
-      });
-      await fetchMessages();
-      setShowPathInfo(true);
-    } else if (smsCaptureState === null && !smsRequested) {
-      setSmsRequestModal(true);
-      setSmsRequested(true);
-    }
-  }, [smsCaptureState, smsRequested]);
+        await fetchMessages();
+        setShowPathInfo(true);
+      } else if (smsCaptureState === null && requestIfNull) {
+        setSmsRequestModal(true);
+      }
+    },
+    [smsCaptureState]
+  );
 
-  const handleOnActive = useCallback(async () => {
+  const handleOnActive = () => {
+    setShowPathInfo(false);
+    handleSmsCapture();
+  };
+
+  const ref = useRef<BottomSheet>(null);
+
+  const handleStart = useCallback(() => {
     setShowPathInfo(false);
     if (pinProtected) {
       setPinModal({
         mode: "enter",
         onComplete() {
           setPinModal({ mode: "" });
-          handleSmsCapture();
+          handleSmsCapture(true);
         },
       });
     } else {
-      handleSmsCapture();
+      handleSmsCapture(true);
     }
   }, [pinProtected]);
-
-  const ref = useRef<BottomSheet>(null);
 
   const fetchMessages = async () => {
     try {
