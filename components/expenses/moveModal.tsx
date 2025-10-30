@@ -3,7 +3,7 @@ import icons from "@/constants/icons";
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { createCollection } from "@/lib/collectionsUtils";
 import validateInput from "@/lib/validateInput";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, View } from "react-native";
 import InputField from "../inputField";
 import ThemedText from "../textThemed";
@@ -37,7 +37,7 @@ const MoveModal = ({
   const [error, setError] = useState<string>("must have at least 1 character");
   const [touched, setTouched] = useState<boolean>(false);
 
-  const handleAdd = async () => {
+  const handleAdd = useCallback(async () => {
     try {
       const normalized = normalizeString(newCollection);
       setCollections((prev) => {
@@ -51,11 +51,7 @@ const MoveModal = ({
     } catch (error) {
       toastError(error, `An error occured when creating collection`);
     }
-  };
-
-  const handleBlur = () => {
-    setAddMode(false);
-  };
+  }, [newCollection]);
 
   const handleChange = (_: string, value: string) => {
     setNewCollection(value);
@@ -126,7 +122,7 @@ const MoveModal = ({
                   touched={touched}
                   error={error}
                   handleChange={handleChange}
-                  handleBlur={handleBlur}
+                  handleBlur={handleAdd}
                   className=" p-[5px] "
                 />
               </View>

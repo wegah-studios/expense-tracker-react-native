@@ -50,6 +50,7 @@ const EditingContext = createContext<{
   setAddExpenseModal: React.Dispatch<React.SetStateAction<boolean>>;
   setFeedbackModal: React.Dispatch<React.SetStateAction<boolean>>;
   handleStatusClose: () => void;
+  handleSmsCapture: (requestIfNull?: boolean | undefined) => Promise<void>;
 } | null>(null);
 
 export const useEditingContext = () => {
@@ -275,7 +276,7 @@ export const EditingContexProvider = ({
         action: {
           callback: () => {
             handleStatusClose();
-            setShowPathInfo(true);
+            handleSmsCapture();
           },
         },
       });
@@ -326,6 +327,7 @@ export const EditingContexProvider = ({
         handleStatusClose,
         setAddExpenseModal,
         setFeedbackModal,
+        handleSmsCapture,
       }}
     >
       {children}

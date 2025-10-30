@@ -24,8 +24,13 @@ import {
 } from "react-native";
 
 const Profile = () => {
-  const { setStatus, handleStatusClose, setFeedbackModal, setPinModal } =
-    useEditingContext();
+  const {
+    setStatus,
+    handleStatusClose,
+    setFeedbackModal,
+    setPinModal,
+    handleSmsCapture,
+  } = useEditingContext();
   const {
     theme,
     toggleTheme,
@@ -104,7 +109,12 @@ const Profile = () => {
         type: "success",
         message: `SMS capture turned ${isSmsCapture ? "off" : "on"}`,
         handleClose: handleStatusClose,
-        action: { callback: handleStatusClose },
+        action: {
+          callback() {
+            handleStatusClose();
+            handleSmsCapture();
+          },
+        },
       });
     } catch (error: any) {
       toastError(error);
@@ -325,8 +335,8 @@ const Profile = () => {
           });
         },
       });
-    }else{
-      turnOnPin()
+    } else {
+      turnOnPin();
     }
   };
 
@@ -397,7 +407,7 @@ const Profile = () => {
       handleClose: handleStatusClose,
       action: {
         callback() {
-          handleStatusClose()
+          handleStatusClose();
           setPinModal({
             mode: "create",
             onBack() {
