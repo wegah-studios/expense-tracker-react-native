@@ -106,7 +106,7 @@ export type StatisticLabel = {
 export type HomeScope = {
   subtitle: string;
   title: string;
-  path: string[];
+  path: string[][];
 };
 
 export type HomeStatisticOption = {
@@ -169,4 +169,13 @@ export type EditingContextProps = Record<string, any> & {
   type: string;
   snapPoints: string[];
   onClose?: () => void;
+};
+
+export type Insight = {
+  subtitle?: string;
+  title: string;
+  path: string[][];
+  value: string;
+  total: number;
+  trends: StatisticTrend[];
 };

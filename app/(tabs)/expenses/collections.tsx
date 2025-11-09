@@ -210,12 +210,13 @@ const Collections = () => {
                   showsHorizontalScrollIndicator={false}
                 >
                   <View
-                    className={` flex-row items-start gap-[10px] ${
-                      expand ? "flex-wrap" : ""
+                    className={` flex-row items-start ${
+                      expand ? "flex-wrap gap-[20px]" : "gap-[10px]"
                     } `}
                   >
                     <CollectionCard
                       selected={false}
+                      grow={expand}
                       handlePress={() => setAddMode(true)}
                       handleLongPress={() => setAddMode(true)}
                       name="add"
@@ -224,6 +225,7 @@ const Collections = () => {
                       <CollectionCard
                         key={index}
                         name={name}
+                        grow={expand}
                         count={collections.map.get(name)}
                         selected={selected.has(name)}
                         handlePress={handleCollectionPress}

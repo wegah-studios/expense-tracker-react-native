@@ -359,8 +359,7 @@ export const importExpenses = async (uri: string) => {
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  const expenses = await parseExcelFile(b64);
-  return expenses;
+  return await parseExcelFile(b64);
 };
 
 export const selectStatementImport = async () => {
@@ -382,8 +381,7 @@ export const importStatement = async (uri: string) => {
   }
 
   const pdfText = await ReactNativePdfTextExtractor.extractTextFromPdf(uri);
-  const expenses = await parsePdfText(pdfText);
-  return expenses;
+  return await parsePdfText(pdfText);
 };
 
 export const dirExists = async (uri: string) => {

@@ -542,7 +542,7 @@ const Profile = () => {
                 </View>
                 <View className=" flex-row justify-between items-center ">
                   <ThemedText className=" text-[1.1rem] font-urbanistMedium ">
-                    Capture sms messages
+                    Automatic expense capture
                   </ThemedText>
                   <View className=" flex-row items-center gap-2 ">
                     <ThemedText>Off</ThemedText>

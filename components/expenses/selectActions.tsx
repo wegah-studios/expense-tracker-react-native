@@ -2,7 +2,11 @@ import { useEditingContext } from "@/context/editingContext";
 import { useAppProps } from "@/context/propContext";
 import { toastError } from "@/lib/appUtils";
 import { updateCollections } from "@/lib/collectionsUtils";
-import { deleteExpenses, restoreExpenses } from "@/lib/expenseUtils";
+import {
+  deleteExpenses,
+  onExpenseUpdate,
+  restoreExpenses,
+} from "@/lib/expenseUtils";
 import { exportExpenses } from "@/lib/exportUtils";
 import { Expense } from "@/types/common";
 import React, { useState } from "react";
@@ -189,13 +193,14 @@ const SelectActions = ({
   };
 
   const handleItemUpdate = (update: Map<number, Partial<Expense>>) => {
-    setExpenses((prev) => {
-      const newArr = Array.from(prev);
-      for (let [index, expense] of update.entries()) {
-        newArr[index] = expense;
-      }
-      return newArr;
-    });
+    const { newExpenses, newCollections } = onExpenseUpdate(
+      expenses,
+      collections,
+      update,
+      collection
+    );
+    setExpenses(newExpenses);
+    setCollections(newCollections);
     setStatus({
       open: true,
       type: "success",
@@ -212,18 +217,19 @@ const SelectActions = ({
   };
 
   const handleMultipleUpdate = (update: Map<number, Partial<Expense>>) => {
-    setExpenses((prev) => {
-      const newArr = Array.from(prev);
-      for (let [index, expense] of update.entries()) {
-        newArr[index] = expense;
-      }
-      return newArr;
-    });
+    const { newExpenses, newCollections } = onExpenseUpdate(
+      expenses,
+      collections,
+      update,
+      collection
+    );
+    setExpenses(newExpenses);
+    setCollections(newCollections);
     setStatus({
       open: true,
       type: "success",
       title: "Expenses updated",
-      message: ` ${update.size} expenses successfully updated`,
+      message: `${update.size} expenses successfully updated`,
       handleClose: handleStatusClose,
       action: {
         callback() {

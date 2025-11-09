@@ -8,12 +8,14 @@ const CollectionCard = ({
   name,
   selected,
   count,
+  grow,
   handlePress,
   handleLongPress,
 }: {
   name: "add" | string;
   selected: boolean;
   count?: number;
+  grow?: boolean;
   handlePress: (name: string) => void;
   handleLongPress: (name: string) => void;
 }) => {
@@ -21,7 +23,9 @@ const CollectionCard = ({
     <Pressable
       onLongPress={() => handleLongPress(name)}
       onPress={() => handlePress(name)}
-      className={` relative w-[100px] min-h-[100px] p-[10px] gap-1 rounded-[20px] flex-col justify-center items-center ${
+      className={` relative w-[100px] min-h-[100px] ${
+        grow ? "grow aspect-square max-w-[calc(33%)]" : ""
+      } p-[10px] gap-1 rounded-[20px] flex-col justify-center items-center ${
         selected
           ? "bg-black dark:bg-white"
           : "bg-paper-light dark:bg-paper-dark"

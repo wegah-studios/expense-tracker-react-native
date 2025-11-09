@@ -3,19 +3,14 @@ import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
 import { formatAmount, toastError } from "@/lib/appUtils";
 import {
+  fetchInsightTrends,
   fetchPathInfo,
-  fetchTrends,
-  getHomeStatisticLabels,
-  getHomeStatisticOptions,
-  getHomeStatisticScopes,
-  getTimePathTitle,
+  getHomeInsightLabels,
+  getHomeInsightOptions,
+  getHomeInsightScopes,
+  getPathString,
 } from "@/lib/statisticsUtils";
-import {
-  HomeScope,
-  Statistic,
-  StatisticOption,
-  StatisticPath,
-} from "@/types/common";
+import { HomeScope, Insight, Statistic, StatisticOption } from "@/types/common";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
@@ -28,25 +23,28 @@ import HomeBudgetWidget from "./budgetWidget";
 
 const HomeStatisticsWidget = () => {
   const { setAddExpenseModal } = useEditingContext();
-  const scopes = useMemo<HomeScope[]>(() => getHomeStatisticScopes(), []);
-  const [options, setOptions] = useState<StatisticOption[][]>([]);
+  const scopes = useMemo<HomeScope[]>(() => getHomeInsightScopes(), []);
+  const [options, setOptions] = useState<Map<string, StatisticOption[]>>(
+    new Map()
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [record, setRecord] = useState<
-    Map<number, Partial<StatisticPath & { labels: Statistic[] }>>
+    Map<string, Insight & { labels: Statistic[] }>
   >(new Map());
   const [scope, setScope] = useState<number>(0);
   const [data, setData] = useState<
-    (StatisticPath & { labels: Statistic[] }) | undefined
+    (Insight & { labels: Statistic[] }) | undefined
   >(undefined);
 
   useEffect(() => {
     const handleScopeChange = async () => {
       try {
-        const stored = record.get(scope);
+        const pathstring = getPathString(scopes[scope].path);
+        const stored = record.get(pathstring);
         setLoading(true);
 
         if (stored) {
-          setData(stored as StatisticPath & { labels: Statistic[] });
+          setData(stored);
           setLoading(false);
           return;
         }
@@ -54,38 +52,34 @@ const HomeStatisticsWidget = () => {
         let scopeData = scopes[scope];
         let updatedOptions = options;
 
-        if (!options.length) {
-          const optionResults = await getHomeStatisticOptions();
+        if (!options.size) {
+          const optionResults = await getHomeInsightOptions();
           setOptions(optionResults);
           updatedOptions = optionResults;
         }
 
-        let path: Partial<StatisticPath & { labels: Statistic[] }> = {
+        let insight: Partial<Insight & { labels: Statistic[] }> = {
           title: scopeData.title,
-          subtitle: getTimePathTitle(scopeData.path),
-          time: scopeData.path,
-          label: [],
+          subtitle: scopeData.subtitle,
+          path: scopeData.path,
         };
 
-        const { total, value } = await fetchPathInfo({
-          time: path.time || [],
-          label: [],
-        });
-        path.total = total;
-        path.value = value;
+        const { total, value } = await fetchPathInfo(scopeData.path);
+        insight.total = total;
+        insight.value = value;
 
         let [trends, labels] = await Promise.all([
-          fetchTrends(path as StatisticPath, updatedOptions),
-          getHomeStatisticLabels(path.time || []),
+          fetchInsightTrends(insight as Insight, updatedOptions),
+          getHomeInsightLabels(scopeData.path),
         ]);
-        path.trends = trends;
-        path.labels = labels;
+        insight.trends = trends;
+        insight.labels = labels;
 
-        setData(path as StatisticPath & { labels: Statistic[] });
+        setData(insight as Insight & { labels: Statistic[] });
         setRecord((prev) => {
-          const newRecord = new Map(prev);
-          newRecord.set(scope, path);
-          return newRecord;
+          const newMap = new Map(prev);
+          newMap.set(pathstring, insight as Insight & { labels: Statistic[] });
+          return newMap;
         });
         setLoading(false);
       } catch (error) {
@@ -101,8 +95,8 @@ const HomeStatisticsWidget = () => {
       router.push({
         pathname: "/insights",
         params: {
-          timePath: JSON.stringify(data.time),
-          paramOptions: JSON.stringify(options),
+          initialPath: JSON.stringify(data.path),
+          initialOptions: JSON.stringify([...options.entries()]),
         },
       });
     }
@@ -113,9 +107,8 @@ const HomeStatisticsWidget = () => {
       router.push({
         pathname: "/insights",
         params: {
-          timePath: JSON.stringify(data.time),
-          labelPath: JSON.stringify([value]),
-          paramOptions: JSON.stringify(options),
+          initialPath: JSON.stringify([[...data.path[0]], [value]]),
+          initialOptions: JSON.stringify([...options.entries()]),
         },
       });
     }
@@ -239,6 +232,11 @@ const HomeStatisticsWidget = () => {
         </ScrollView>
       </View>
       <HomeBudgetWidget scope={scope} />
+      {!!data?.labels.length && (
+        <ThemedText className=" capitalize font-urbanistMedium text-[1.2rem] ">
+          {data.title}'s expenses
+        </ThemedText>
+      )}
       <View className=" flex-row gap-[20px] flex-wrap ">
         {data?.labels.map((label, index) => (
           <LabelCard

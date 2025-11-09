@@ -2,58 +2,58 @@ import db from "@/db/schema";
 import {
   Expense,
   HomeScope,
+  Insight,
   Statistic,
   StatisticOption,
-  StatisticPath,
   StatisticTrend,
 } from "@/types/common";
 import dayjs from "dayjs";
 import { formatAmount } from "./appUtils";
 
-export const fetchPathInfo = async (path: {
-  time: string[];
-  label: string[];
-}) => {
-  let query = "all";
-  let value: string = "";
-
-  if (path.label.length) {
-    const labelArr = [...path.label];
-    value = labelArr.pop() || "";
-    query = `${path.time.join("/") || "all"}/${
-      (labelArr.length ? labelArr.join("/") + "/" : "") + "labels/" + value
-    }`;
-  } else if (path.time.length) {
-    const timeArr = [...path.time];
-    value = timeArr.pop() || "";
-    query =
-      (timeArr.length
-        ? `${timeArr.join("/")}/${timeArr.length === 1 ? "months" : "dates"}`
-        : "years") +
-      "/" +
-      value;
-  }
-
-  const data: Statistic | null = await db.getFirstAsync(
-    `SELECT * FROM statistics WHERE path = ? AND total > 0 `,
-    query
-  );
-
-  return { total: data?.total || 0, value };
+export const getPathString = (path: string[][]) => {
+  const group = path[1].length
+    ? path[0].length
+      ? "labels"
+      : "all/labels"
+    : path[0].length === 1
+    ? "years"
+    : path[0].length === 2
+    ? "months"
+    : path[0].length === 3
+    ? "dates"
+    : "all";
+  const combined = path.flat();
+  const value = combined.pop();
+  const pathstring =
+    combined.join("/") +
+    (combined.length ? "/" : "") +
+    group +
+    (value ? "/" + value : "");
+  return pathstring;
 };
 
-export const fetchTrends = async (
-  path: StatisticPath,
-  options: { value: string; total: number }[][]
+export const fetchPathInfo = async (path: string[][]) => {
+  const data: Statistic | null = await db.getFirstAsync(
+    `SELECT * FROM statistics WHERE path = ? AND total > 0 LIMIT 1`,
+    getPathString(path)
+  );
+
+  return { total: data?.total || 0, value: data?.value || "" };
+};
+
+export const fetchInsightTrends = async (
+  insight: Insight,
+  options: Map<string, StatisticOption[]>
 ) => {
   let trends: StatisticTrend[] = [];
-  if (path.label.length) {
-    const selectedOptions = options[path.time.length];
-    if (selectedOptions?.length > 1) {
-      const label = path.label[path.label.length - 1];
+  if (insight.path[1].length) {
+    const key = getPathString([insight.path[0], []]);
+    const selectedOptions = options.get(key);
+    if (selectedOptions && selectedOptions.length > 1) {
+      const label = insight.path[1][insight.path[1].length - 1];
       let paths = selectedOptions.map(
         (option) =>
-          `${path.time.length ? path.time.join("/") + "/" : ""}${
+          `${insight.path[0].length ? insight.path[0].join("/") + "/" : ""}${
             option.value
           }/labels/${label}`
       );
@@ -66,11 +66,11 @@ export const fetchTrends = async (
 
       if (data.length > 1) {
         trends.push({
-          title: `Ksh ${formatAmount(path.total / data.length)}`,
-          description: `spent on ${path.value} per ${
-            !path.time.length
+          title: `Ksh ${formatAmount(insight.total / data.length)}`,
+          description: `spent on ${insight.value} per ${
+            !insight.path[0].length
               ? "year"
-              : path.time.length === 1
+              : insight.path[0].length === 1
               ? "month"
               : "day"
           }`,
@@ -78,37 +78,44 @@ export const fetchTrends = async (
       }
     }
   } else {
-    const selectedOptions = options[path.time.length];
-    if (selectedOptions?.length > 1) {
+    const key = getPathString([insight.path[0], []]);
+    const selectedOptions = options.get(key);
+    if (selectedOptions && selectedOptions.length > 1) {
       trends.push({
         title: `-Ksh ${formatAmount(
-          path.total / selectedOptions.length,
+          insight.total / selectedOptions.length,
           10000
         )}`,
         description: `per ${
-          !path.time.length ? "year" : path.time.length === 1 ? "month" : "day"
+          !insight.path[0].length
+            ? "year"
+            : insight.path[0].length === 1
+            ? "month"
+            : "day"
         }`,
       });
     }
-    if (path.time.length) {
-      const relativeOptions = options[path.time.length - 1];
-      if (relativeOptions?.length > 1) {
+
+    if (insight.path[0].length) {
+      const key = getPathString([insight.path[0].slice(0, -1), []]);
+      const relativeOptions = options.get(key);
+      if (relativeOptions && relativeOptions.length > 1) {
         const pathIndex = relativeOptions.findIndex(
-          (item) => item.value === path.value
+          (item) => item.value === insight.value
         );
         const nearestOption =
           relativeOptions[pathIndex - 1] || relativeOptions[pathIndex + 1];
-        let nearestOptionPath = path.time.slice(0, -1);
+        let nearestOptionPath = insight.path[0].slice(0, -1);
         nearestOptionPath[nearestOptionPath.length] = nearestOption.value;
-        const diff = path.total - nearestOption.total;
+        const diff = insight.total - nearestOption.total;
         trends.push({
           title: `${diff < 0 ? "-" : "+"}Ksh ${formatAmount(
             Math.abs(diff),
             10000
           )}`,
-          description: `${
-            diff < 0 ? "less than" : "more than"
-          } ${getTimePathTitle(nearestOptionPath)}`,
+          description: `${diff < 0 ? "less than" : "more than"} ${getPathTitles(
+            [nearestOptionPath, []]
+          ).title}`,
         });
       }
     }
@@ -116,13 +123,13 @@ export const fetchTrends = async (
   return trends;
 };
 
-export const fetchStatisticLabels = async (
-  path: { time: string[]; label: string[] },
+export const fetchInsightLabels = async (
+  path: string[][],
   page: number = 1
 ) => {
   let query =
-    (path.time.join("/") || "all") +
-    (path.label.length ? "/" + path.label.join("/") : "") +
+    (path[0].join("/") || "all") +
+    (path[1].length ? "/" + path[1].join("/") : "") +
     `/labels/%`;
 
   const offset = (page - 1) * 6;
@@ -143,13 +150,10 @@ export const fetchStatisticLabels = async (
   return result;
 };
 
-export const fetchStatisticOptions = async (
-  path: string[],
-  options: StatisticOption[][]
-) => {
+export const fetchInsightOptions = async (path: string[][]) => {
   let query = `${
-    path.length
-      ? path.join("/") + "/" + (path.length === 1 ? "months" : "dates")
+    path[0].length
+      ? path[0].join("/") + "/" + (path[0].length === 1 ? "months" : "dates")
       : `years`
   }`;
   const data: Statistic[] = await db.getAllAsync(
@@ -161,17 +165,17 @@ export const fetchStatisticOptions = async (
     let title = "";
     let subtitle = "";
 
-    if (!path.length) {
+    if (!path[0].length) {
       let date = new Date();
       const diff = date.getFullYear() - Number(item.value);
       subtitle = `${diff === 0 ? "this" : diff === 1 ? "last" : diff} year${
         diff > 1 ? "s ago" : ""
       }`;
       title = item.value;
-    } else if (path.length === 1) {
+    } else if (path[0].length === 1) {
       [subtitle] = item.path.split("/").slice(-3);
       title = months[Number(item.value)];
-    } else if (path.length === 2) {
+    } else if (path[0].length === 2) {
       title = ("0" + item.value).slice(-2);
       const [year, month, _c, day] = item.path.split("/");
       const date = new Date(Number(year), Number(month), Number(day));
@@ -181,17 +185,16 @@ export const fetchStatisticOptions = async (
     return { title, subtitle, value: item.value, total: item.total };
   });
 
-  options = Array.from(options);
-  options[path.length] = result;
-  return options;
+  return result;
 };
 
-export const getTimePathTitle = (path: string[]) => {
+export const getPathTitles = (path: string[][]) => {
   let title = "All time";
-  if (path.length) {
-    const year = path[0];
-    const month = path[1];
-    const day = path[2];
+  let subtitle = "";
+  if (path[0].length) {
+    const year = path[0][0];
+    const month = path[0][1];
+    const day = path[0][2];
 
     const date = new Date(Number(year), Number(month) || 0, Number(day) || 1);
 
@@ -205,61 +208,74 @@ export const getTimePathTitle = (path: string[]) => {
       title = date.getFullYear().toString();
     }
   }
-  return title;
+  if (path[1].length) {
+    subtitle = title;
+    title = path[1][path[1].length - 1];
+  }
+  return { title, subtitle };
 };
 
-export const getHomeStatisticScopes = () => {
+export const getHomeInsightScopes = () => {
   const date = new Date();
   let data: HomeScope[] = [
     {
       subtitle: dayjs(date).format("DD MMM YYYY"),
       title: "Today",
       path: [
-        date.getFullYear().toString(),
-        date.getMonth().toString(),
-        date.getDate().toString(),
+        [
+          date.getFullYear().toString(),
+          date.getMonth().toString(),
+          date.getDate().toString(),
+        ],
+        [],
       ],
     },
     {
       subtitle: dayjs(date).format("MMM YYYY"),
       title: "This month",
-      path: [date.getFullYear().toString(), date.getMonth().toString()],
+      path: [[date.getFullYear().toString(), date.getMonth().toString()], []],
     },
     {
       subtitle: date.getFullYear().toString(),
       title: "This year",
-      path: [date.getFullYear().toString()],
+      path: [[date.getFullYear().toString()], []],
     },
     {
       subtitle: "All",
       title: "All time",
-      path: [],
+      path: [[], []],
     },
   ];
 
   return data;
 };
 
-export const getHomeStatisticOptions = async () => {
+export const getHomeInsightOptions = async () => {
   const date = new Date();
-  let options: StatisticOption[][] = [];
+  let paths: Record<number, string[][]> = {
+    0: [[], []],
+    1: [[date.getFullYear().toString()], []],
+    2: [[date.getFullYear().toString(), date.getMonth().toString()], []],
+  };
+  let record: Map<string, StatisticOption[]> = new Map();
   (
     await Promise.all([
-      fetchStatisticOptions([], []),
-      fetchStatisticOptions([date.getFullYear().toString()], []),
-      fetchStatisticOptions(
-        [date.getFullYear().toString(), date.getMonth().toString()],
-        []
-      ),
+      fetchInsightOptions(paths[0]),
+      fetchInsightOptions(paths[1]),
+      fetchInsightOptions(paths[2]),
     ])
   ).map((results, index) => {
-    options[index] = results[index];
+    const pathstring = getPathString(paths[index]);
+    record.set(pathstring, results);
   });
-  return options;
+  return record;
 };
 
-export const getHomeStatisticLabels = async (path: string[]) => {
-  const query = (path.join("/") || "all") + `/labels/%`;
+export const getHomeInsightLabels = async (path: string[][]) => {
+  let query =
+    (path[0].join("/") || "all") +
+    (path[1].length ? "/" + path[1].join("/") : "") +
+    `/labels/%`;
   const data: Statistic[] = await db.getAllAsync(
     `SELECT * FROM statistics WHERE path LIKE ? AND total > 0 ORDER BY total DESC LIMIT 4 OFFSET 0 `,
     query
@@ -267,6 +283,11 @@ export const getHomeStatisticLabels = async (path: string[]) => {
 
   return data;
 };
+
+export const parseHomeRecord = async (
+  record: Insight & { labels: Statistic[] },
+  options: Map<string, StatisticOption[]>
+) => {};
 
 export const months = [
   "Jan",
@@ -278,6 +299,7 @@ export const months = [
   "Jul",
   "Aug",
   "Sep",
+  "Oct",
   "Nov",
   "Dec",
 ];
@@ -327,7 +349,7 @@ export const getStatisticsPaths = (dateString: string, label: string[]) => {
   paths = paths.concat(
     labelPaths.map((item) => ({ path: path + item.path, value: item.value }))
   );
-  
+
   return paths;
 };
 

@@ -40,18 +40,24 @@ const MoveModal = ({
   const handleAdd = useCallback(async () => {
     try {
       const normalized = normalizeString(newCollection);
-      setCollections((prev) => {
-        const newMap = new Map(prev.map);
-        newMap.set(normalized, 0);
-        return { map: newMap, names: [normalized, ...prev.names] };
-      });
-      setNewCollection("");
-      setAddMode(false);
-      await createCollection(normalized);
+      if (normalized && !error) {
+        setCollections((prev) => {
+          const newMap = new Map(prev.map);
+          newMap.set(normalized, 0);
+          return { map: newMap, names: [normalized, ...prev.names] };
+        });
+        setNewCollection("");
+        setAddMode(false);
+        await createCollection(normalized);
+      } else {
+        if (!touched) {
+          setTouched(true);
+        }
+      }
     } catch (error) {
       toastError(error, `An error occured when creating collection`);
     }
-  }, [newCollection]);
+  }, [newCollection, error, touched]);
 
   const handleChange = (_: string, value: string) => {
     setNewCollection(value);

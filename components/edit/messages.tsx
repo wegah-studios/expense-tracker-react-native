@@ -2,17 +2,23 @@ import icons from "@/constants/icons";
 import { toastError } from "@/lib/appUtils";
 import { pasteFromClipboard } from "@/lib/clipboardUtils";
 import { parseMessages } from "@/lib/expenseUtils";
-import { Expense, Status } from "@/types/common";
+import { Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
-import { Dimensions, Keyboard, Pressable, View } from "react-native";
+import {
+  Dimensions,
+  Keyboard,
+  Pressable,
+  ToastAndroid,
+  View,
+} from "react-native";
 import InputField from "../inputField";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
 const Messages = (props: Record<string, any>) => {
   const { handleUpdate, close, setStatus, handleStatusClose } = props as {
-    handleUpdate: (expenses: Partial<Expense>[]) => void;
+    handleUpdate: (report: { complete: number; incomplete: number }) => void;
     close: () => void;
     setStatus: React.Dispatch<React.SetStateAction<Status>>;
     handleStatusClose: () => void;
@@ -48,18 +54,11 @@ const Messages = (props: Record<string, any>) => {
       action: { callback() {} },
     });
     try {
-      const data = await parseMessages(receipt);
-      if (!data.length) {
-        toastError(
-          new Error(`No expenses found`, { cause: 1 }),
-          `No expenses found`
-        );
-        return;
-      }
-      handleUpdate(data);
+      const report = await parseMessages(receipt);
+      handleUpdate(report);
       close();
     } catch (error) {
-      toastError(error,);
+      toastError(error);
       setStatus({
         open: true,
         type: "error",

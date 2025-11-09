@@ -1,7 +1,7 @@
 import icons from "@/constants/icons";
 import { toastError } from "@/lib/appUtils";
 import { importExpenses, importStatement } from "@/lib/exportUtils";
-import { EditingContextProps, Expense, Status } from "@/types/common";
+import { EditingContextProps, Status } from "@/types/common";
 import { Href, router, usePathname } from "expo-router";
 import React, { useState } from "react";
 import { Modal, Pressable, View } from "react-native";
@@ -38,22 +38,12 @@ const AddExpenseModal = ({
       message: `New expense added`,
       handleClose: handleStatusClose,
       action: {
-        title: "View",
         callback() {
-          const path: Href = {
-            pathname: "/expenses/collection",
-            params: { collection: "expenses", filter: "modifiedAt" },
-          };
-          if (pathname !== "/expenses/collection") {
-            router.push(path);
-          } else {
-            router.replace(path);
-          }
+          router.replace(pathname as any);
           handleStatusClose();
         },
       },
     });
-    router.replace(pathname as Href);
   };
 
   const handleManualForm = () => {
@@ -76,21 +66,39 @@ const AddExpenseModal = ({
     handleClose();
   };
 
-  const handleMessagesSubmit = (data: Partial<Expense>[]) => {
+  const handleMessagesSubmit = (report: {
+    complete: number;
+    incomplete: number;
+  }) => {
+    if (!report.complete && !report.incomplete) {
+      setStatus({
+        open: true,
+        type: "info",
+        title: "No expenses found.",
+        message: "No expenses have been imported, please try again.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+    }
     setStatus({
       open: true,
-      type: "success",
+      type: "info",
       title: "Expenses imported",
-      message: `${data.length} new expenses imported.`,
+      message: `New expenses imported:${
+        report.complete ? `\n\n✅ ${report.complete} successfully added.` : ""
+      }${
+        report.incomplete
+          ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+          : ""
+      }`,
       handleClose: handleStatusClose,
       action: {
         title: "View",
         callback() {
-          const path: Href = {
-            pathname: "/expenses/collection",
-            params: { collection: "expenses", filter: "modifiedAt" },
-          };
-          if (pathname !== "/expenses/collection") {
+          const path: Href = "/expenses/collections";
+          if (pathname !== "/expenses/collections") {
             router.push(path);
           } else {
             router.replace(path);
@@ -133,33 +141,44 @@ const AddExpenseModal = ({
           callback() {},
         },
       });
-      let data: Partial<Expense>[] = [];
+      let report: { complete: number; incomplete: number } = {
+        complete: 0,
+        incomplete: 0,
+      };
       if (fileModal.type === "excel") {
-        data = await importExpenses(uri);
+        report = await importExpenses(uri);
       } else if (fileModal.type === "pdf") {
-        data = await importStatement(uri);
+        report = await importStatement(uri);
       }
-      if (!data.length) {
-        toastError(
-          new Error(`No expenses found`, { cause: 1 }),
-          `No expenses found`
-        );
-        return;
+      if (!report.complete && !report.incomplete) {
+        setStatus({
+          open: true,
+          type: "info",
+          title: "No expenses found.",
+          message: "No expenses have been imported, please try again.",
+          handleClose: handleStatusClose,
+          action: {
+            callback: handleStatusClose,
+          },
+        });
       }
       setStatus({
         open: true,
-        type: "success",
-        title: "Expenses added",
-        message: `${data.length} new expenses added.`,
+        type: "info",
+        title: "Expenses imported",
+        message: `New expenses imported:${
+        report.complete ? `\n\n✅ ${report.complete} successfully added.` : ""
+      }${
+        report.incomplete
+          ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+          : ""
+      }`,
         handleClose: handleStatusClose,
         action: {
           title: "View",
           callback() {
-            const path: Href = {
-              pathname: "/expenses/collection",
-              params: { collection: "expenses", filter: "modifiedAt" },
-            };
-            if (pathname !== "/expenses/collection") {
+            const path: Href = "/expenses/collections";
+            if (pathname !== "/expenses/collections") {
               router.push(path);
             } else {
               router.replace(path);

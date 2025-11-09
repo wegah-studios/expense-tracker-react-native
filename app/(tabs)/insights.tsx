@@ -7,15 +7,16 @@ import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
 import { formatAmount } from "@/lib/appUtils";
 import {
+  fetchInsightLabels,
+  fetchInsightOptions,
+  fetchInsightTrends,
   fetchPathInfo,
-  fetchStatisticLabels,
-  fetchStatisticOptions,
-  fetchTrends,
-  getTimePathTitle,
+  getPathString,
+  getPathTitles,
 } from "@/lib/statisticsUtils";
-import { Statistic, StatisticOption, StatisticPath } from "@/types/common";
+import { Insight, Statistic, StatisticOption } from "@/types/common";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Image,
@@ -26,187 +27,199 @@ import {
 } from "react-native";
 import * as Progress from "react-native-progress";
 
-const Statistics = () => {
-  const { timePath, labelPath, paramOptions } = useLocalSearchParams() as {
-    timePath?: string;
-    labelPath?: string;
-    paramOptions?: string;
+const InsightsPage = () => {
+  const { initialPath, initialOptions } = useLocalSearchParams() as {
+    initialPath?: string;
+    initialOptions?: string;
   };
   const { setAddExpenseModal } = useEditingContext();
 
   const [loading, setLoading] = useState<{
-    statistics: boolean;
-    options: boolean;
+    insights: boolean;
     labels: boolean;
-  }>({ statistics: true, options: true, labels: true });
+  }>({ insights: true, labels: true });
 
   const [canGoNext, setCanGoNext] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [paths, setPaths] = useState<StatisticPath[]>([]);
-  const [options, setOptions] = useState<StatisticOption[][]>([]);
+  const [mainPaths, setMainPaths] = useState<string[][][]>([]);
+  const [options, setOptions] = useState<Map<string, StatisticOption[]>>(
+    new Map()
+  );
+  const [record, setRecord] = useState<Map<string, Insight>>(new Map());
+  const [focusPath, setFocusPath] = useState<Insight | undefined>(undefined);
+  const [optionPath, setOptionPath] = useState<string>();
   const [labels, setLabels] = useState<Statistic[][]>([]);
-  const [activePath, setActivePath] = useState<StatisticPath | undefined>(
-    undefined
-  );
-  const [option, setOption] = useState<number>(0);
-  const basePath = useMemo<StatisticPath | undefined>(
-    () => paths[paths.length - 1],
-    [paths]
-  );
-  const canPress = useMemo<boolean>(
+  const mainPath = useMemo<Insight | undefined>(
     () =>
-      !!activePath &&
-      !!basePath &&
-      !!activePath.time.length &&
-      activePath.time.length !== 3 &&
-      activePath.value !== basePath.value &&
-      !activePath.label.length,
-    [activePath, basePath]
+      mainPaths.length
+        ? record.get(getPathString(mainPaths[mainPaths.length - 1]))
+        : undefined,
+    [mainPaths]
+  );
+  const optionArr = useMemo<StatisticOption[]>(
+    () => (optionPath ? options.get(optionPath) || [] : []),
+    [options, optionPath]
+  );
+  const actionTitle = useMemo<string>(
+    () =>
+      !!focusPath &&
+      !!mainPath &&
+      focusPath.value !== mainPath.value &&
+      !focusPath.path[1].length
+        ? focusPath.path[0].length === 1
+          ? "Go to months"
+          : focusPath.path[0].length === 2
+          ? "Go to days"
+          : ""
+        : "",
+    [mainPath, focusPath]
   );
   const isLabelStatistics = useMemo(
-    () => !!activePath?.label.length,
-    [activePath]
-  );
-  const timeValue = useMemo<string | undefined>(
-    () => activePath && activePath.time[activePath.time.length - 1],
-    [activePath]
+    () => !!focusPath?.path[1].length,
+    [focusPath]
   );
 
   useEffect(() => {
-    let time = timePath ? (JSON.parse(timePath) as string[]) : [];
-    let label = labelPath ? (JSON.parse(labelPath) as string[]) : [];
-    let importedOptions = paramOptions
-      ? (JSON.parse(paramOptions) as StatisticOption[][])
-      : [];
-    updatePath(
-      { time, label },
-      {
-        options: paramOptions ? importedOptions : true,
-        paths: true,
-        activePath: true,
-        labels: true,
-      }
-    );
-    if (paramOptions) {
-      setOptions(importedOptions);
-      setOption(time.length);
-    }
-  }, [timePath, labelPath, paramOptions]);
-
-  const handlePathPress = () => {
-    if (canPress && activePath) {
-      updatePath(activePath, { paths: true, options: true });
-    }
-  };
-
-  const updatePath = async (
-    path: Partial<StatisticPath>,
-    updates: {
-      options?: boolean | StatisticOption[][];
-      paths?: boolean;
-      activePath?: boolean;
-      labels?: boolean;
-    }
-  ) => {
-    path.time = path.time || [];
-    path.label = path.label || [];
-
-    if (updates.labels) {
-      setLoading((prev) => ({ ...prev, labels: true }));
-      const labelResults = await fetchStatisticLabels({
-        time: path.time,
-        label: path.label,
-      });
-      setLabels(labelResults);
-      setPage(1);
-      setLoading((prev) => ({ ...prev, labels: false }));
-    }
-
-    let updatedOptions = options;
-    if (!!updates.options) {
-      if (typeof updates.options === "boolean") {
-        setLoading((prev) => ({ ...prev, options: true }));
-        const optionResults = await fetchStatisticOptions(path.time, options);
-        updatedOptions = optionResults;
-        setOptions(optionResults);
-        setOption(path.time.length);
-        setLoading((prev) => ({ ...prev, options: false }));
-      } else {
-        setLoading((prev) => ({ ...prev, options: true }));
-        updatedOptions = updates.options;
-        setOptions(updates.options);
-        setOption(path.time.length);
-        setLoading((prev) => ({ ...prev, options: false }));
-      }
-    }
-
-    if (updates.activePath) {
-      setLoading((prev) => ({ ...prev, statistics: true }));
-      path.title = getTimePathTitle(path.time);
-      path.subtitle = "";
-
-      if (path.label?.length) {
-        path.subtitle = path.title;
-        path.title = path.label[path.label.length - 1];
-      }
-      const { total, value } = await fetchPathInfo({
-        time: path.time,
-        label: path.label,
-      });
-      path.total = total;
-      path.value = value;
-      const trendResults = await fetchTrends(
-        path as StatisticPath,
-        updatedOptions
-      );
-      path.trends = trendResults;
-      setActivePath(path as StatisticPath);
-      setLoading((prev) => ({ ...prev, statistics: false }));
-    }
-
-    if (updates.paths) {
-      setPaths((prev) => prev.concat(path as StatisticPath));
-    }
-  };
-
-  const handleOptionPress = (value: string) => {
-    if (basePath) {
-      let newTime = [...basePath.time];
-      if (timeValue !== value) {
-        newTime.push(value);
-      }
-      updatePath(
-        { time: newTime, label: [] },
-        { activePath: true, labels: true }
-      );
-    }
-  };
-
-  const handleLabelPress = (value: string) => {
-    if (activePath) {
-      const newLabel = [...activePath.label, value];
-      updatePath(
-        { time: activePath.time, label: newLabel },
-        { activePath: true, paths: true, labels: true }
-      );
-    }
-  };
-
-  const handleBack = () => {
-    setPaths((prev) => {
-      prev.pop();
-      if (prev.length) {
-        const newPath = prev[prev.length - 1];
-        updatePath(newPath, { options: true, labels: true });
-        setActivePath(newPath);
-      } else {
-        router.back();
-      }
-      return Array.from(prev);
+    const path = initialPath
+      ? (JSON.parse(initialPath) as string[][])
+      : [[], []];
+    const optionsMap: Map<string, StatisticOption[]> = initialOptions
+      ? new Map(JSON.parse(initialOptions) as [string, StatisticOption[]][])
+      : new Map();
+    updateInsights({
+      path,
+      updateOptions: initialOptions ? optionsMap : undefined,
+      updateFocus: true,
+      updateLabels: true,
+      updateMain: true,
     });
-  };
+  }, []);
+
+  const updateInsights = useCallback(
+    async ({
+      path,
+      updateOptions,
+      updateFocus,
+      updateLabels,
+      updateMain,
+    }: {
+      path: string[][];
+      updateOptions?: Map<string, StatisticOption[]>;
+      updateFocus?: boolean;
+      updateLabels?: boolean;
+      updateMain?: boolean;
+    }) => {
+      const pathstring = getPathString(path);
+      let storedOptions = options;
+      if (updateOptions) {
+        storedOptions = updateOptions;
+        setOptions(storedOptions);
+      }
+
+      if (updateFocus) {
+        const storedInsight = record.get(pathstring);
+        if (storedInsight) {
+          setFocusPath(storedInsight);
+        } else {
+          setLoading((prev) => ({ ...prev, insights: true }));
+          const { total, value } = await fetchPathInfo(path);
+          if (!storedOptions.has(pathstring)) {
+            const optionResults = await fetchInsightOptions(path);
+            storedOptions = new Map(storedOptions);
+            storedOptions.set(pathstring, optionResults);
+            setOptions(storedOptions);
+          }
+          const { title, subtitle } = getPathTitles(path);
+          let insight: Partial<Insight> = {
+            total,
+            value,
+            path,
+            title,
+            subtitle,
+          };
+          record.set(pathstring, insight as Insight);
+          insight.trends = await fetchInsightTrends(
+            insight as Insight,
+            storedOptions
+          );
+          setRecord((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(pathstring, insight as Insight);
+            return newMap;
+          });
+          setFocusPath(insight as Insight);
+          setLoading((prev) => ({ ...prev, insights: false }));
+        }
+      }
+
+      if (updateLabels) {
+        setLoading((prev) => ({ ...prev, labels: true }));
+        const labelResults = await fetchInsightLabels(path);
+        setLabels(labelResults);
+        setPage(1);
+        setLoading((prev) => ({ ...prev, labels: false }));
+      }
+
+      if (updateMain) {
+        setMainPaths((prev) => prev.concat([path]));
+        setOptionPath(pathstring);
+      }
+    },
+    [record, options]
+  );
+
+  const handlePathPress = useCallback(() => {
+    if (actionTitle && focusPath) {
+      updateInsights({ path: focusPath.path, updateMain: true });
+    }
+  }, [actionTitle, focusPath]);
+
+  const handleOptionPress = useCallback(
+    (value: string) => {
+      if (mainPath && focusPath) {
+        const newPath = [[...mainPath.path[0]], []];
+        if (focusPath.value !== value) {
+          newPath[0].push(value);
+        }
+        updateInsights({
+          path: newPath,
+          updateFocus: true,
+          updateLabels: true,
+        });
+      }
+    },
+    [mainPath, focusPath]
+  );
+
+  const handleLabelPress = useCallback(
+    (value: string) => {
+      if (focusPath) {
+        const newPath = [[...focusPath.path[0]], [...focusPath.path[1]]];
+        newPath[1].push(value);
+        updateInsights({
+          path: newPath,
+          updateFocus: true,
+          updateMain: true,
+          updateLabels: true,
+        });
+      }
+    },
+    [focusPath]
+  );
+
+  const handleBack = useCallback(() => {
+    mainPaths.pop();
+    if (mainPaths.length) {
+      const newPath = mainPaths[mainPaths.length - 1];
+      updateInsights({ path: newPath, updateFocus: true, updateLabels: true });
+      setOptionPath(getPathString(newPath));
+      setMainPaths(Array.from(mainPaths));
+    } else {
+      router.back();
+    }
+  }, [mainPaths]);
 
   const handleHasReachedEnd = () => {
     if (!loading.labels && canGoNext && labels.length >= page * 3) {
@@ -215,15 +228,15 @@ const Statistics = () => {
     }
   };
 
-  const handleNextPage = async () => {
-    if (activePath) {
+  const handleNextPage = useCallback(async () => {
+    if (focusPath) {
       setLoading((prev) => ({ ...prev, labels: true }));
-      const newPage = await fetchStatisticLabels(activePath, page + 1);
+      const newPage = await fetchInsightLabels(focusPath.path, page + 1);
       setLabels((prev) => prev.concat(newPage));
       setPage((prev) => prev + 1);
       setLoading((prev) => ({ ...prev, labels: false }));
     }
-  };
+  }, [focusPath, page]);
 
   const handleAddExpense = () => {
     setAddExpenseModal(true);
@@ -234,7 +247,7 @@ const Statistics = () => {
     setTimeout(() => {
       router.replace({
         pathname: "/insights",
-        params: { timePath, labelPath, paramOptions },
+        params: { initialPath, initialOptions },
       });
     }, 500);
   };
@@ -254,12 +267,12 @@ const Statistics = () => {
         <ThemedText
           className={` text-[1.5rem] font-urbanistMedium capitalize `}
         >
-          {basePath && basePath.title}
+          {mainPath && mainPath.title}
         </ThemedText>
       </View>
-      {!labels.length && !activePath ? (
+      {!labels.length && !focusPath ? (
         <View className=" flex-1 flex-col gap-[20px] items-center justify-center ">
-          {loading.statistics ? (
+          {loading.insights ? (
             <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
           ) : (
             <>
@@ -310,7 +323,7 @@ const Statistics = () => {
           data={labels}
           renderItem={({ item: group, index }) => (
             <StatisticLabelGroup
-              total={activePath?.total || 0}
+              total={focusPath?.total || 0}
               handleLabelPress={handleLabelPress}
               index={index}
               group={group}
@@ -321,70 +334,64 @@ const Statistics = () => {
               <Pressable
                 onPress={handlePathPress}
                 className={` p-[20px] flex-col gap-[20px] rounded-[20px] bg-${
-                  colorCycle[paths.length % 3]
+                  colorCycle[mainPaths.length % 3]
                 } `}
               >
-                {loading.statistics ? (
+                {loading.insights ? (
                   <View className=" flex-row min-h-[100px] justify-center items-center ">
                     <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
                   </View>
-                ) : !activePath?.total ? (
+                ) : !focusPath?.total ? (
                   <View className=" h-[200px] flex-col gap-[20px] items-center justify-center ">
-                    {loading.statistics ? (
-                      <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
-                    ) : (
-                      <>
-                        <ThemedIcon
-                          toggleOnDark={false}
-                          source={icons.pieChart}
-                          className=" w-[40px] h-[40px] "
-                          tintColor={tintColors.divider}
-                        />
-                        <ThemedText
-                          toggleOnDark={false}
-                          className=" font-urbanistMedium text-[1.2rem] "
-                        >
-                          No data
-                        </ThemedText>
-                        <Pressable
-                          onPress={handleAddExpense}
-                          className=" flex-row gap-2 items-center p-[20px] pt-[10px] pb-[10px] bg-black rounded-[20px] "
-                        >
-                          <Image
-                            source={icons.add}
-                            className=" w-[10px] h-[10px] "
-                            tintColor={tintColors.light}
-                          />
-                          <ThemedText toggleOnDark={false} reverse>
-                            Add Expense
-                          </ThemedText>
-                        </Pressable>
-                      </>
-                    )}
+                    <ThemedIcon
+                      toggleOnDark={false}
+                      source={icons.pieChart}
+                      className=" w-[40px] h-[40px] "
+                      tintColor={tintColors.divider}
+                    />
+                    <ThemedText
+                      toggleOnDark={false}
+                      className=" font-urbanistMedium text-[1.2rem] "
+                    >
+                      No data
+                    </ThemedText>
+                    <Pressable
+                      onPress={handleAddExpense}
+                      className=" flex-row gap-2 items-center p-[20px] pt-[10px] pb-[10px] bg-black rounded-[20px] "
+                    >
+                      <Image
+                        source={icons.add}
+                        className=" w-[10px] h-[10px] "
+                        tintColor={tintColors.light}
+                      />
+                      <ThemedText toggleOnDark={false} reverse>
+                        Add Expense
+                      </ThemedText>
+                    </Pressable>
                   </View>
                 ) : (
                   <>
                     <View className=" flex-row items-start justify-between ">
                       <View className=" flex-col gap-[20px] ">
-                        {!!activePath.subtitle && (
+                        {!!focusPath.subtitle && (
                           <ThemedText
                             toggleOnDark={false}
                             className=" font-urbanistMedium "
                           >
-                            {activePath.subtitle}
+                            {focusPath.subtitle}
                           </ThemedText>
                         )}
                         <ThemedText
                           toggleOnDark={false}
                           className=" capitalize text-[1.8rem] font-urbanistMedium "
                         >
-                          {activePath.title}
+                          {focusPath.title}
                         </ThemedText>
                       </View>
-                      {canPress && (
+                      {!!actionTitle && (
                         <View className=" p-[10px] pt-[5px] pb-[5px] flex-row items-center gap-1 bg-black rounded-[20px] ">
                           <ThemedText reverse toggleOnDark={false}>
-                            More info
+                            {actionTitle}
                           </ThemedText>
                           <ThemedIcon
                             reverse
@@ -400,11 +407,11 @@ const Statistics = () => {
                       toggleOnDark={false}
                       className=" text-[2rem] font-urbanistBold "
                     >
-                      - Ksh {formatAmount(activePath.total, 1000000)}
+                      - Ksh {formatAmount(focusPath.total, 1000000)}
                     </ThemedText>
-                    {!!activePath.trends.length && (
+                    {!!focusPath.trends.length && (
                       <View className=" flex-row gap-2 justify-between items-center flex-wrap ">
-                        {activePath.trends.map((stat, index) => (
+                        {focusPath.trends.map((stat, index) => (
                           <ThemedText key={index} toggleOnDark={false}>
                             <ThemedText
                               toggleOnDark={false}
@@ -421,9 +428,9 @@ const Statistics = () => {
                 )}
               </Pressable>
               {!isLabelStatistics &&
-                (!!options[option]?.length || loading.options) && (
+                (!!optionArr.length || loading.insights) && (
                   <View className=" pt-[20px] pb-[20px] pr-[5px] pl-[5px] rounded-[20px] bg-paper-light dark:bg-paper-dark ">
-                    {loading.options ? (
+                    {loading.insights ? (
                       <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
                     ) : (
                       <ScrollView
@@ -431,11 +438,11 @@ const Statistics = () => {
                         showsHorizontalScrollIndicator={false}
                       >
                         <View className=" pr-[15px] pl-[15px] flex-row gap-[10px] ">
-                          {options[option].map((item, index) => (
+                          {optionArr.map((item, index) => (
                             <StatisticsOption
                               key={index}
                               {...item}
-                              active={timeValue === item.value}
+                              active={focusPath?.value === item.value}
                               onPress={handleOptionPress}
                             />
                           ))}
@@ -444,9 +451,9 @@ const Statistics = () => {
                     )}
                   </View>
                 )}
-              {!!labels.length && (
+              {!!labels.length && focusPath && (
                 <ThemedText className=" capitalize text-[1.5rem] font-urbanistMedium ">
-                  {activePath?.title} expenses
+                  {focusPath.title} expenses
                 </ThemedText>
               )}
             </View>
@@ -457,4 +464,4 @@ const Statistics = () => {
   );
 };
 
-export default Statistics;
+export default InsightsPage;

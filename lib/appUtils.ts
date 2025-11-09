@@ -7,7 +7,9 @@ import * as Device from "expo-device";
 import * as FileSystem from "expo-file-system";
 import * as MailComposer from "expo-mail-composer";
 import { ToastAndroid } from "react-native";
+import { stopCapture } from "react-native-sms-listener";
 import { zip } from "react-native-zip-archive";
+import { removePin } from "./pinUtils";
 
 const LOGS_INTEGRITY = `308c92676fa959739801af19e74098d15d5813627ff6f3ae65b267c1a1676605`;
 export const logs: string[] = [];
@@ -87,6 +89,8 @@ export const factoryReset = async () => {
     DROP TABLE notifications;
     ${schema}
     `),
+      stopCapture(),
+      removePin(),
       FileSystem.deleteAsync(`${FileSystem.documentDirectory}images`, {
         idempotent: true,
       }),

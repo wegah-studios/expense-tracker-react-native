@@ -79,11 +79,17 @@ const EditExpense = (props: Record<string, any>) => {
   const isEmpty = useMemo(
     () =>
       !changes.size ||
-      (mode !== "multiple" && !expense.date && changes.size <= 1),
-    [mode, changes, expenses]
+      (mode !== "multiple" &&
+        !expense.date &&
+        expense.collection !== "failed" &&
+        changes.size <= 1),
+    [mode, changes, expense]
   );
   const noCollection = useMemo(
-    () => !form.collection || form.collection === "expenses",
+    () =>
+      !form.collection ||
+      form.collection === "expenses" ||
+      form.collection === "failed",
     [form.collection]
   );
 
@@ -254,14 +260,20 @@ const EditExpense = (props: Record<string, any>) => {
         }
         if (mode !== "multiple") {
           edit.id = expense.id;
-
-          if (expense.collection === "failed") {
+          if (
+            (expense.collection === "failed" || mode === "add") &&
+            !edit.collection
+          ) {
             edit.collection = "expenses";
+          }
+          if (expense.collection === "failed") {
+            const edits = edit;
+            edit = { ...expense, ...edits };
           }
           await updateExpense(
             edit,
             mode === "add" ? "add" : "update",
-            expense,
+            mode === "edit" ? expense : undefined,
             true
           );
           edit = { ...expense, ...edit };

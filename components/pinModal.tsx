@@ -144,7 +144,6 @@ const PinModal = ({
               action: { callback: handleStatusClose },
             });
             await factoryReset();
-            await removePin();
             handleStatusClose();
             router.replace("/");
           } catch (error) {

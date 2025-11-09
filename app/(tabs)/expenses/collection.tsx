@@ -8,9 +8,14 @@ import ThemedIcon from "@/components/themedIcon";
 import { tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
+import { useAppProps } from "@/context/propContext";
 import { useCustomThemeContext } from "@/context/themeContext";
 import { normalizeString, toastError } from "@/lib/appUtils";
-import { getExpenses, groupExpenseSections } from "@/lib/expenseUtils";
+import {
+  getExpenses,
+  groupExpenseSections,
+  onExpenseUpdate,
+} from "@/lib/expenseUtils";
 import { exportExpenses } from "@/lib/exportUtils";
 import { Expense } from "@/types/common";
 import { MenuView, NativeActionEvent } from "@react-native-menu/menu";
@@ -33,6 +38,20 @@ const Collection = () => {
   const { collection, filter } = useLocalSearchParams() as {
     collection?: string;
     filter?: string;
+  };
+
+  const { collections, setCollections } = useAppProps() as {
+    loading: boolean;
+    collections: {
+      map: Map<string, number>;
+      names: string[];
+    };
+    setCollections: React.Dispatch<
+      React.SetStateAction<{
+        map: Map<string, number>;
+        names: string[];
+      }>
+    >;
   };
   const { open, setStatus, handleStatusClose } = useEditingContext();
 
@@ -276,25 +295,41 @@ const Collection = () => {
 
   const handleItemEdit = useCallback(
     (index: number) => {
-      open({
-        type: "expense",
-        snapPoints: ["100%"],
-        expenses: [expenses[index]],
-        mode: "edit",
-        indices: [index],
-        handleUpdate: handleItemUpdate,
-      });
+      const expense = expenses[index];
+      if (expense.collection !== "trash") {
+        open({
+          type: "expense",
+          snapPoints: ["100%"],
+          expenses: [expenses[index]],
+          mode: "edit",
+          indices: [index],
+          handleUpdate: handleItemUpdate,
+        });
+      }
     },
     [expenses]
   );
 
   const handleItemUpdate = (update: Map<number, Partial<Expense>>) => {
-    setExpenses((prev) => {
-      const newArr = Array.from(prev);
-      for (let [index, expense] of update.entries()) {
-        newArr[index] = expense;
-      }
-      return newArr;
+    const { newExpenses, newCollections } = onExpenseUpdate(
+      expenses,
+      collections,
+      update,
+      expenseCollection
+    );
+    setExpenses(newExpenses);
+    setCollections(newCollections);
+    setStatus({
+      open: true,
+      type: "success",
+      title: "Expense updated",
+      message: "Expense successfully updated",
+      handleClose: handleStatusClose,
+      action: {
+        callback() {
+          handleStatusClose();
+        },
+      },
     });
   };
 

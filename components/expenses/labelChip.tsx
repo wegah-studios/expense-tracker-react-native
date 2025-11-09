@@ -34,7 +34,7 @@ const LabelChip = ({
       <ThemedText
         toggleOnDark={color === "theme"}
         reverse={color !== "theme"}
-        className={` capitalize ${size === "md" ? "text-[1.2rem]" : ""} `}
+        className={`  capitalize ${size === "md" ? "text-[1.2rem]" : ""} `}
       >
         {name}
       </ThemedText>

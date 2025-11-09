@@ -32,6 +32,7 @@ import {
   clearStoredReceipts,
   deleteReceipt,
   getStoredReceipts,
+  removeMessageCapturedListener,
 } from "react-native-sms-listener";
 import { useCustomThemeContext } from "./themeContext";
 
@@ -94,11 +95,8 @@ export const EditingContexProvider = ({
     onComplete?: () => void;
     onBack?: () => void;
   }>({ mode: "" });
-
   const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
   const [initialCheck, setInitialCheck] = useState<boolean>(false);
-  const [smsSubScription, setSmsSubscription] =
-    useState<NativeEventSubscription>();
 
   useEffect(() => {
     if (!initialCheck) {
@@ -111,6 +109,8 @@ export const EditingContexProvider = ({
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         handleOnActive();
+      } else if (nextAppState === "background") {
+        removeMessageCapturedListener();
       }
     });
 
@@ -120,26 +120,22 @@ export const EditingContexProvider = ({
   const handleSmsCapture = useCallback(
     async (requestIfNull?: boolean) => {
       if (smsCaptureState === "on") {
-        setSmsSubscription((prev) => {
-          prev?.remove();
-          return addOnMessageCapturedListener((message) => {
-            const onSmsEvent = async () => {
-              try {
-                await handleSmsEvent(message);
-                await deleteReceipt(message.id);
-                ToastAndroid.show(
-                  "New expense added, reload to see changes",
-                  ToastAndroid.LONG
-                );
-              } catch (error) {
-                toastError(error, "An error occured while adding new expense");
-              }
-            };
-            onSmsEvent();
-          });
+        addOnMessageCapturedListener((message) => {
+          const onSmsEvent = async () => {
+            try {
+              await handleSmsEvent(message);
+              await deleteReceipt(message.id);
+              ToastAndroid.show(
+                "New expense imported, reload to see changes",
+                ToastAndroid.LONG
+              );
+            } catch (error) {
+              toastError(error, "An error occured while adding new expense");
+            }
+          };
+          onSmsEvent();
         });
         await fetchMessages();
-        setShowPathInfo(true);
       } else if (smsCaptureState === null && requestIfNull) {
         setSmsRequestModal(true);
       }
@@ -191,23 +187,48 @@ export const EditingContexProvider = ({
             callback: handleStatusClose,
           },
         });
-        const expenses = await importFromSMSListener(messages);
+        const report = await importFromSMSListener(messages);
         await clearStoredReceipts();
+        if (!report.complete && !report.incomplete) {
+          setStatus({
+            open: true,
+            type: "info",
+            title: "No expenses found.",
+            message: "No expenses have been imported.",
+            handleClose: handleStatusClose,
+            action: {
+              callback() {
+                handleStatusClose();
+                setShowPathInfo(true);
+              },
+            },
+          });
+        }
         setStatus({
           open: true,
-          type: "success",
-          title: "New expenses added",
-          message: `${expenses.length} new expenses added.`,
+          type: "info",
+          title: "Expenses imported",
+          message: `New expenses imported:${
+            report.complete
+              ? `\n\n✅ ${report.complete} successfully added.`
+              : ""
+          }${
+            report.incomplete
+              ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+              : ""
+          }`,
           handleClose: handleStatusClose,
           action: {
-            callback: () => {
+            callback() {
               router.replace({ pathname: pathname as any, params });
               handleStatusClose();
+              setShowPathInfo(true);
             },
           },
         });
       } else {
         handleStatusClose();
+        setShowPathInfo(true);
       }
     } catch (error) {
       setStatus({
@@ -217,7 +238,10 @@ export const EditingContexProvider = ({
           "An error occured while checking for new expenses, please try again.",
         handleClose: handleStatusClose,
         action: {
-          callback: handleStatusClose,
+          callback() {
+            handleStatusClose();
+            setShowPathInfo(true);
+          },
         },
       });
     }
@@ -277,6 +301,7 @@ export const EditingContexProvider = ({
           callback: () => {
             handleStatusClose();
             handleSmsCapture();
+            setShowPathInfo(true);
           },
         },
       });
@@ -289,7 +314,12 @@ export const EditingContexProvider = ({
             ? error.message
             : "An error occured while enabling auto expense capture.",
         handleClose: handleStatusClose,
-        action: { callback: handleStatusClose },
+        action: {
+          callback() {
+            handleStatusClose();
+            setShowPathInfo(true);
+          },
+        },
       });
     }
   };

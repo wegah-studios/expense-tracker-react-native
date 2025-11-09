@@ -1,5 +1,6 @@
 import db from "@/db/schema";
 import { DictionaryItem, Expense } from "@/types/common";
+import * as Filesystem from "expo-file-system";
 import { nanoid } from "nanoid/non-secure";
 import { deleteReceipt } from "react-native-sms-listener";
 import * as XLSX from "xlsx";
@@ -115,11 +116,15 @@ export const deleteExpenses = async (
             expense.collection !== "failed" &&
             expense.collection !== "trash"
           ) {
-            const count = collections.map.get("trash");
+            let count = collections.map.get("trash");
             collections.map.set("trash", (count || 0) + 1);
           }
-          const count = collections.map.get(expense.collection);
+          let count = collections.map.get(expense.collection);
           collections.map.set(expense.collection, (count || 1) - 1);
+          if (expense.collection !== "expenses") {
+            count = collections.map.get("expenses");
+            collections.map.set("expenses", (count || 1) - 1);
+          }
         }
         return false;
       } else {
@@ -149,9 +154,14 @@ export const restoreExpenses = async (
     let collection = expense.collection;
     if (selected.has(index)) {
       if (collection) {
-        promises.push(removeFromCollection(collection || ""));
+        promises.push(removeFromCollection(collection));
         expense.collection = "expenses";
-        promises.push(updateExpense(expense));
+        promises.push(
+          updateExpense({
+            ...expense,
+            image: `${Filesystem.documentDirectory}images/${expense.image}`,
+          })
+        );
       }
     } else {
       return true;
@@ -194,6 +204,47 @@ export const groupExpenseSections = (
   return { groups, indices };
 };
 
+export const onExpenseUpdate = (
+  expenses: Partial<Expense>[],
+  collections: { names: string[]; map: Map<string, number> },
+  update: Map<number, Partial<Expense>>,
+  collection: string
+) => {
+  let newExpenses: Partial<Expense>[] = [];
+  const newCollections = {
+    names: [...collections.names],
+    map: new Map(collections.map),
+  };
+  expenses.forEach((expense, index) => {
+    const edit = update.get(index);
+    if (edit) {
+      if (
+        edit.collection &&
+        expense.collection &&
+        edit.collection !== expense.collection
+      ) {
+        if (!newCollections.map.has(edit.collection)) {
+          newCollections.names.push(edit.collection);
+        }
+        const expenseCount = newCollections.map.get(expense.collection) || 1;
+        const editCount = newCollections.map.get(edit.collection) || 0;
+        newCollections.map.set(expense.collection, expenseCount - 1);
+        newCollections.map.set(edit.collection, editCount + 1);
+        
+        if (collection === "expenses") {
+          newExpenses.push(edit);
+        }
+      } else {
+        newExpenses.push(edit);
+      }
+    } else {
+      newExpenses.push(expense);
+    }
+  });
+
+  return { newExpenses, newCollections };
+};
+
 export const updateExpense = async (
   expense: Partial<Expense>,
   mode: "add" | "delete" | "update" = "add",
@@ -216,7 +267,7 @@ export const updateExpense = async (
       query = `UPDATE expenses SET collection = ?, modifiedAt = ?`;
       params.push("trash", expense.modifiedAt);
 
-      if (expense.image) {
+      if (expense.image && (isTrash || isFailed)) {
         promises.push(deleteImage(expense.image));
       }
 
@@ -227,6 +278,9 @@ export const updateExpense = async (
 
     if (expense.collection) {
       promises.push(removeFromCollection(expense.collection));
+      if (expense.collection !== "expenses" && !isTrash && !isFailed) {
+        promises.push(removeFromCollection("expenses"));
+      }
     }
   } else {
     expense.id = expense.id || nanoid();
@@ -255,6 +309,8 @@ export const updateExpense = async (
       );
     }
 
+    console.log("fuck this shit: ", expense);
+
     const keys = Object.keys(expense);
     const values = Object.values(expense);
 
@@ -264,9 +320,13 @@ export const updateExpense = async (
       )}) VALUES ( ?${", ?".repeat(keys.length - 1)})`;
       params = values;
 
-      promises.push(addToCollection("expenses"));
-      if (expense.collection && expense.collection !== "expenses") {
-        promises.push(addToCollection(expense.collection));
+      if (expense.collection) {
+        if (expense.collection !== "failed") {
+          promises.push(addToCollection("expenses"));
+        }
+        if (expense.collection !== "expenses") {
+          promises.push(addToCollection(expense.collection));
+        }
       }
     }
     if (mode === "update") {
@@ -331,7 +391,10 @@ export const updateMultipleExpenses = async (
 };
 
 export const parseMessages = async (str: string) => {
-  const expenses: Partial<Expense>[] = [];
+  const report: { complete: number; incomplete: number } = {
+    complete: 0,
+    incomplete: 0,
+  };
   const messages: string[] = await new Promise((resolve, reject) => {
     const data = str.split(/confirmed/i);
     resolve(data);
@@ -345,17 +408,17 @@ export const parseMessages = async (str: string) => {
       if (/^(?=.*\d)[A-Z\d]{10}$/.test(ref)) {
         let message: string =
           ref + " confirmed " + messages[i + 1].slice(0, -11);
-        promises.push(handleMessage(message, expenses));
+        promises.push(handleMessage(message, report));
       }
     }
     await Promise.all(promises);
   });
-  return expenses;
+  return report;
 };
 
 export const handleMessage = async (
   message: string,
-  expenses: Partial<Expense>[]
+  report: { complete: number; incomplete: number }
 ) => {
   if (!/(sent to|paid to|you bought|withdraw)/i.test(message)) {
     return;
@@ -378,11 +441,12 @@ export const handleMessage = async (
 
   if (data.amount === undefined || !data.date || !data.recipient) {
     data.collection = "failed";
+    report.incomplete += 1;
   } else {
     data.collection = "expenses";
+    report.complete += 1;
   }
   await updateExpense(data);
-  expenses.push(data);
 };
 
 const parseMessage = (message: string) => {
@@ -493,11 +557,13 @@ export const parsePdfText = async (text: string) => {
   );
 
   let expenses: Partial<Expense>[] = [];
+  let incomplete = 0;
+  let complete = 0;
   let record: Record<string, { index: number; isTransactionCost: boolean }> =
     {};
 
   if (!receipts || !receipts.length) {
-    return expenses;
+    return { incomplete, complete };
   }
 
   for (let receipt of receipts) {
@@ -519,8 +585,10 @@ export const parsePdfText = async (text: string) => {
             !expense.recipient
           ) {
             expense.collection = "failed";
+            incomplete += 1;
           } else {
             expense.collection = "expenses";
+            complete += 1;
           }
           await updateExpense(expense);
           resolve();
@@ -530,7 +598,7 @@ export const parsePdfText = async (text: string) => {
     await Promise.all(promises);
   });
 
-  return expenses;
+  return { incomplete, complete };
 };
 
 export const handlePdfReceipt = (
@@ -600,6 +668,8 @@ export const handlePdfReceipt = (
 };
 
 export const parseExcelFile = async (b64: string) => {
+  let complete = 0;
+  let incomplete = 0;
   let expenses: Partial<Expense>[] = [];
   await db.withTransactionAsync(async () => {
     const wb = XLSX.read(b64, { type: "base64" });
@@ -640,12 +710,13 @@ export const parseExcelFile = async (b64: string) => {
             !expense.amount
           ) {
             expense.collection = "failed";
+            incomplete += 1;
           } else {
             expense.collection = "expenses";
+            complete += 1;
           }
           expense.id = nanoid();
           expense.currency = "Ksh";
-          expenses.push(expense);
           promises.push(updateExpense(expense));
         }
       }
@@ -653,24 +724,30 @@ export const parseExcelFile = async (b64: string) => {
 
     await Promise.all(promises);
   });
-  return expenses;
+  return { complete, incomplete };
 };
 
 export const importFromSMSListener = async (messages: string[]) => {
-  const expenses: Partial<Expense>[] = [];
+  const report: { complete: number; incomplete: number } = {
+    complete: 0,
+    incomplete: 0,
+  };
   await db.withTransactionAsync(async () => {
     const promises: Promise<any>[] = [];
     for (let message of messages) {
-      promises.push(handleMessage(message, expenses));
+      promises.push(handleMessage(message, report));
     }
     await Promise.all(promises);
   });
-  return expenses;
+  return report;
 };
 
 export const handleSmsEvent = async (message: { id: number; body: string }) => {
-  const expenses: Partial<Expense>[] = [];
-  await handleMessage(message.body, expenses);
+  const report: { complete: number; incomplete: number } = {
+    complete: 0,
+    incomplete: 0,
+  };
+  await handleMessage(message.body, report);
   await deleteReceipt(message.id);
-  return expenses[0];
+  return report;
 };
