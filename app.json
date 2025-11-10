@@ -14,7 +14,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.wegah_studios.qwantu"
+      "package": "com.wegah_studios.expense_tracker"
     },
     "web": {
       "bundler": "metro",
@@ -93,7 +93,10 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "114eeb47-5bfd-4422-b9f5-51224cc208a6"
+      }
     }
   }
 }
