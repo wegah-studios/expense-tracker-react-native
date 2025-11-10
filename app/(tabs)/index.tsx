@@ -1,4 +1,5 @@
 import HomeExpenseWidget from "@/components/home/expenseWidget";
+import NotificationIcon from "@/components/home/notificationIcon";
 import HomeStatisticsWidget from "@/components/home/statisticsWidget";
 import ThemedText from "@/components/textThemed";
 import ThemedIcon from "@/components/themedIcon";
@@ -40,14 +41,7 @@ const Home = () => {
               />
             </Pressable>
           </Link>
-          <Link href={"/notifications"} asChild>
-            <Pressable>
-              <ThemedIcon
-                source={icons.notification}
-                className="w-[25px] h-[25px]"
-              />
-            </Pressable>
-          </Link>
+          <NotificationIcon />
           <Link href={"/profile"} asChild>
             <Pressable>
               <ThemedIcon

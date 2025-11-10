@@ -113,9 +113,9 @@ export const fetchInsightTrends = async (
             Math.abs(diff),
             10000
           )}`,
-          description: `${diff < 0 ? "less than" : "more than"} ${getPathTitles(
-            [nearestOptionPath, []]
-          ).title}`,
+          description: `${diff < 0 ? "less than" : "more than"} ${
+            getPathTitles([nearestOptionPath, []]).title
+          }`,
         });
       }
     }
@@ -182,7 +182,7 @@ export const fetchInsightOptions = async (path: string[][]) => {
       subtitle = dayjs(date).format("ddd");
     }
 
-    return { title, subtitle, value: item.value, total: item.total };
+    return { title, subtitle, ...item };
   });
 
   return result;

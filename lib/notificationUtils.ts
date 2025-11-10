@@ -2,6 +2,13 @@ import db from "@/db/schema";
 import { Notification } from "@/types/common";
 import { nanoid } from "nanoid/non-secure";
 
+export const checkForUnread = async () => {
+  let result: { unread: 1 | 0 } | null = await db.getFirstAsync(
+    `SELECT unread FROM notifications ORDER BY date DESC LIMIT 1 `
+  );
+  return !!result?.unread;
+};
+
 export const getNotifications = async (page: number = 1) => {
   let limit = 10;
   let offset = (page - 1) * limit;

@@ -490,7 +490,7 @@ const EditExpense = (props: Record<string, any>) => {
             />
             <ThemedText
               toggleOnDark={!noCollection}
-              className={` capitalize ${noCollection ? "text-divider" : ""} `}
+              className={` flex-1 capitalize ${noCollection ? "text-divider" : ""} `}
             >
               {noCollection ? "No collection selected" : form.collection}
             </ThemedText>

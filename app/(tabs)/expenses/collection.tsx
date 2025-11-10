@@ -26,6 +26,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   SectionList,
   TextInput,
   ToastAndroid,
@@ -419,8 +420,8 @@ const Collection = () => {
     <>
       <View className=" flex-1 ">
         <View className=" pt-[10px] pb-[20px] flex-col gap-[20px] ">
-          <View className=" flex-row justify-between items-center  gap-1 ">
-            <View className=" flex-row items-center">
+          <View className=" flex-row justify-between items-center gap-3 ">
+            <View className=" flex-1 flex-row items-center">
               <Pressable
                 onPress={handleTitleBtnClick}
                 className=" w-[40px] h-[40px] flex-row items-center   "
@@ -432,9 +433,15 @@ const Collection = () => {
                   }`}
                 />
               </Pressable>
-              <ThemedText className=" font-urbanistBold text-[2rem] capitalize">
-                {selectMode ? `${selected.size} Selected` : expenseCollection}
-              </ThemedText>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="flex-1"
+              >
+                <ThemedText className=" font-urbanistBold text-[2rem] capitalize">
+                  {selectMode ? `${selected.size} Selected` : expenseCollection}
+                </ThemedText>
+              </ScrollView>
             </View>
             {selectMode ? (
               <Pressable onPress={handleSelectAll} className=" mt-[4px]">

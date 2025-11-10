@@ -442,7 +442,10 @@ const InsightsPage = () => {
                             <StatisticsOption
                               key={index}
                               {...item}
-                              active={focusPath?.value === item.value}
+                              active={
+                                !!focusPath &&
+                                getPathString(focusPath.path) === item.path
+                              }
                               onPress={handleOptionPress}
                             />
                           ))}

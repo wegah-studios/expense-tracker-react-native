@@ -124,8 +124,8 @@ const AddExpenseModal = ({
     setFileModal({
       open: true,
       type: "excel",
-      title: "Import Statements",
-      info: "Open the M-pesa app and export your statements, then select the file here to import it.",
+      title: "Import From Excel",
+      info: "To import expenses from an excel file each row should have a 'label', 'recipient', 'amount' and 'date'",
     });
   };
 

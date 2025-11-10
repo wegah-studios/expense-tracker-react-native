@@ -148,7 +148,7 @@ const MoveModal = ({
                     key={index}
                     onPress={() => handleSelect(name)}
                     className={
-                      " flex-row gap-1 justify-between items-center pt-[15px] pb-[15px]"
+                      " flex-row gap-3 justify-between items-center pt-[15px] pb-[15px]"
                     }
                   >
                     <View className=" mb-[5px] flex-1 flex-row items-center gap-2 ">
@@ -160,9 +160,11 @@ const MoveModal = ({
                         }
                         className=" w-[15px] h-[15px] "
                       />
-                      <ThemedText className=" capitalize font-urbanistMedium text-[1.2rem] ">
-                        {name}
-                      </ThemedText>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <ThemedText className=" capitalize font-urbanistMedium text-[1.2rem] ">
+                          {name}
+                        </ThemedText>
+                      </ScrollView>
                     </View>
                     <View className=" flex-row items-center gap-3 ">
                       <ThemedText

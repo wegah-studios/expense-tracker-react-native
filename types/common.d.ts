@@ -86,11 +86,9 @@ export type StatisticPath = {
   trends: StatisticTrend[];
 };
 
-export type StatisticOption = {
+export type StatisticOption = Statistic & {
   subtitle: string;
   title: string;
-  value: string;
-  total: number;
 };
 
 export type StatisticTrend = {
