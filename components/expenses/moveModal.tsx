@@ -68,7 +68,7 @@ const MoveModal = ({
     if (collections.map.has(normalized)) {
       setError("already exists");
     } else {
-      setError(validateInput("", normalized, {}, false, 1, 30));
+      setError(validateInput("", normalized, false, 1, 30));
     }
   };
 

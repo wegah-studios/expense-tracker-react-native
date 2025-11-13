@@ -164,7 +164,6 @@ const EditExpense = (props: Record<string, any>) => {
       [name]: validateInput(
         name,
         value,
-        form,
         mode !== "multiple" && name !== "ref" && name !== "receipt"
       ),
     }));
@@ -334,7 +333,7 @@ const EditExpense = (props: Record<string, any>) => {
         setForm((prev) => ({ ...prev, receipt: text }));
         setErrors((prev) => ({
           ...prev,
-          receipt: validateInput("receipt", text, {}, false, undefined, 400),
+          receipt: validateInput("receipt", text, false),
         }));
         setChanges((prev) => {
           const newSet = new Set(prev);

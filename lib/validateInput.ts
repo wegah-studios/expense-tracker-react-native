@@ -1,7 +1,6 @@
 const validateInput = (
   name: string,
   value: string,
-  form: any,
   required: boolean = true,
   min?: number,
   max?: number
@@ -17,21 +16,6 @@ const validateInput = (
           return "must be greater than 0";
         }
       }
-    },
-    email() {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value as string)) {
-        return "email invalid";
-      }
-    },
-    confirmPassword() {
-      if (value !== form.password) {
-        return "passwords must match";
-      }
-    },
-    safeInput() {
-      if (value && !/^[a-zA-Z0-9\s'-]+$/.test(value))
-        return "must contain only letters, numbers, spaces, hyphens, or apostrophes";
-      return "";
     },
   };
 

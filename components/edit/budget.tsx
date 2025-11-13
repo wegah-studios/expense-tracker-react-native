@@ -228,7 +228,13 @@ const EditBudget = (props: Record<string, any>) => {
 
     setErrors((prev) => ({
       ...prev,
-      [name]: validateInput(name, value, form, name !== "title"),
+      [name]: validateInput(
+        name,
+        value,
+        name !== "title",
+        undefined,
+        name === "title" ? 30 : undefined
+      ),
     }));
     setForm((prev) => ({
       ...prev,

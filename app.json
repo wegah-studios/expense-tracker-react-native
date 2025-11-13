@@ -2,7 +2,7 @@
   "expo": {
     "name": "Qwantu",
     "slug": "qwantu",
-    "version": "2.2.5",
+    "version": "2.2.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "application",
