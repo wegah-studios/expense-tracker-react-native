@@ -85,6 +85,7 @@ export const schema = `
 
       INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("1", "info", "/dictionary/main", "Automatically label expenses", "View your dictionary and assign labels to expenses.", "${date.toISOString()}", 1);
       INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("2", "info", "/profile", "Secure your expenses", "Setup a pin to restrict access to your expenses.", "${date.toISOString()}", 1);
+      INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("3", "info", "/expenses/collections", "Editing expenses", "You can edit multiple expenses in one go by long pressing then selecting as many expenses as you need and press edit at the top. Only the values entered will be changed.", "${date.toISOString()}", 1);
       `;
 
 export const initDB = async () => {

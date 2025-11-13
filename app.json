@@ -2,7 +2,7 @@
   "expo": {
     "name": "Qwantu",
     "slug": "qwantu",
-    "version": "2.2.4",
+    "version": "2.2.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "application",
@@ -93,10 +93,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "114eeb47-5bfd-4422-b9f5-51224cc208a6"
-      }
+      "router": {}
     }
   }
 }

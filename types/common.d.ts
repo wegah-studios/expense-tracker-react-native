@@ -33,24 +33,6 @@ export type ExpenseFormErrors = {
   receipt: string;
 };
 
-export type QueryParameters = {
-  search?: string;
-  collection?: string;
-  ids?: string[];
-};
-
-export type ReceiptModal = {
-  open: boolean;
-  receipt: string;
-  image: string;
-};
-
-export type DateParts = {
-  year?: number;
-  month?: number;
-  date?: number;
-};
-
 export type Status = {
   open: boolean;
   type: "loading" | "info" | "success" | "warning" | "error" | "confirm";
@@ -61,13 +43,6 @@ export type Status = {
     title?: string;
     callback: () => void;
   };
-};
-
-export type BudgetForm = {
-  total: string;
-  title: string;
-  start: Date;
-  end: Date;
 };
 
 export type Statistic = {
