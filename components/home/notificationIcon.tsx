@@ -12,7 +12,7 @@ const NotificationIcon = () => {
     const handleShowBadge = async () => {
       try {
         const result = await checkForUnread();
-        console.log(result)
+        console.log(result);
         setShowBadge(result);
       } catch (error) {
         toastError(error);
@@ -24,7 +24,10 @@ const NotificationIcon = () => {
     <Link href={"/notifications"} asChild>
       <Pressable className=" relative ">
         {showBadge && (
-          <View style={{zIndex:1}} className=" absolute right-0 top-0 w-[10px] h-[10px] rounded-[50%] bg-info " />
+          <View
+            style={{ zIndex: 1 }}
+            className=" absolute right-0 top-0 w-[10px] h-[10px] rounded-[50%] bg-info "
+          />
         )}
         <ThemedIcon source={icons.notification} className="w-[25px] h-[25px]" />
       </Pressable>

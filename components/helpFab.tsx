@@ -7,9 +7,7 @@ import { Image, Pressable } from "react-native";
 const HelpFab = () => {
   const { setFeedbackModal } = useEditingContext();
   const handlePress = async () => {
-    await openBrowserAsync(
-      "https://qwantu.wegahstudios.com/help"
-    );
+    await openBrowserAsync("https://qwantu.wegahstudios.com/help");
   };
   const handleLongPress = () => {
     setFeedbackModal(true);

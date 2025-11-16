@@ -160,7 +160,10 @@ const MoveModal = ({
                         }
                         className=" w-[15px] h-[15px] "
                       />
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                      >
                         <ThemedText className=" capitalize font-urbanistMedium text-[1.2rem] ">
                           {name}
                         </ThemedText>

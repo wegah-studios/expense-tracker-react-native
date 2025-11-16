@@ -1,10 +1,11 @@
 import icons from "@/constants/icons";
 import { factoryReset, toastError } from "@/lib/appUtils";
-import { removePin, updatePin, verifyPin } from "@/lib/pinUtils";
+import { updatePin, verifyPin } from "@/lib/pinUtils";
 import { Status } from "@/types/common";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, SafeAreaView, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import PinButton from "./pinButton";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
@@ -63,7 +64,7 @@ const PinModal = ({
                 callback() {
                   handleStatusClose();
                   setPin("");
-                  setState("")
+                  setState("");
                   onComplete && onComplete();
                 },
               },
@@ -87,7 +88,7 @@ const PinModal = ({
             } else {
               setState("success");
               handleStatusClose();
-              setState("")
+              setState("");
               onComplete && onComplete();
             }
           }

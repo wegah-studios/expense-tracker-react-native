@@ -81,7 +81,7 @@ const EditDictionary = (props: Record<string, any>) => {
 
     setErrors((prev) => ({
       ...prev,
-      [name]: validateInput(name, value,),
+      [name]: validateInput(name, value),
     }));
     setForm((prev) => ({
       ...prev,

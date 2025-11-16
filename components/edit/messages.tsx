@@ -5,13 +5,7 @@ import { parseMessages } from "@/lib/expenseUtils";
 import { Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
-import {
-  Dimensions,
-  Keyboard,
-  Pressable,
-  ToastAndroid,
-  View,
-} from "react-native";
+import { Dimensions, Keyboard, Pressable, View } from "react-native";
 import InputField from "../inputField";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";

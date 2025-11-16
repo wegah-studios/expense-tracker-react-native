@@ -4,7 +4,7 @@ import { enc, HmacSHA256 } from "crypto-js";
 import dayjs from "dayjs";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as MailComposer from "expo-mail-composer";
 import { ToastAndroid } from "react-native";
 import { stopCapture } from "react-native-sms-listener";

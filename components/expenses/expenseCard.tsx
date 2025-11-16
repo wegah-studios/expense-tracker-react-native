@@ -110,7 +110,10 @@ const ExpenseCard = React.memo(
               } `}
             >
               {expense.amount
-                ? "-" + expense.currency + " " + formatAmount(expense.amount, 10000)
+                ? "-" +
+                  expense.currency +
+                  " " +
+                  formatAmount(expense.amount, 10000)
                 : "amount: missing"}
             </ThemedText>
           </View>

@@ -32,7 +32,9 @@ const SelectAction = ({
         }
       />
       <Text
-        className={` capitalize ${disabled ? " text-divider " : " text-black dark:text-white "} `}
+        className={` capitalize ${
+          disabled ? " text-divider " : " text-black dark:text-white "
+        } `}
       >
         {type}
       </Text>

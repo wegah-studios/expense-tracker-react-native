@@ -1,6 +1,6 @@
 import db from "@/db/schema";
-import { DictionaryItem, Expense } from "@/types/common";
-import * as Filesystem from "expo-file-system";
+import { Expense } from "@/types/common";
+import * as Filesystem from "expo-file-system/legacy";
 import { nanoid } from "nanoid/non-secure";
 import { deleteReceipt } from "react-native-sms-listener";
 import * as XLSX from "xlsx";
@@ -230,7 +230,7 @@ export const onExpenseUpdate = (
         const editCount = newCollections.map.get(edit.collection) || 0;
         newCollections.map.set(expense.collection, expenseCount - 1);
         newCollections.map.set(edit.collection, editCount + 1);
-        
+
         if (collection === "expenses") {
           newExpenses.push(edit);
         }
@@ -520,16 +520,16 @@ export const fetchExpenseLabel = async (recipient?: string) => {
     return label;
   }
 
-  const dictionaryResult: DictionaryItem | null = await db.getFirstAsync(
-    "SELECT * FROM dictionary WHERE match = ? ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
+  const dictionaryResult: { label: string } | null = await db.getFirstAsync(
+    "SELECT label FROM dictionary WHERE match = ? ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
     recipient
   );
 
   if (dictionaryResult) {
     label = dictionaryResult.label;
   } else {
-    const keywordResult: DictionaryItem | null = await db.getFirstAsync(
-      "SELECT * FROM dictionary WHERE ? LIKE '%' || match || '%' ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
+    const keywordResult: { label: string } | null = await db.getFirstAsync(
+      "SELECT label FROM dictionary WHERE ? LIKE '%' || match || '%' ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
       recipient
     );
 
@@ -544,7 +544,8 @@ export const fetchExpenseLabel = async (recipient?: string) => {
     let accountIndex = recipient.indexOf("for account");
     if (accountIndex !== -1) {
       accountIndex += 12;
-      label += "," + recipient.substring(accountIndex);
+      let account = recipient.substring(accountIndex).split(" ")[0]
+      label += "," + account;
     }
   }
 

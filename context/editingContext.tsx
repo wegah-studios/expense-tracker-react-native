@@ -21,12 +21,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  AppState,
-  Keyboard,
-  NativeEventSubscription,
-  ToastAndroid,
-} from "react-native";
+import { AppState, Keyboard, ToastAndroid } from "react-native";
 import {
   addOnMessageCapturedListener,
   clearStoredReceipts,

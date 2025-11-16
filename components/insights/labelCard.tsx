@@ -3,7 +3,7 @@ import icons from "@/constants/icons";
 import { formatAmount } from "@/lib/appUtils";
 import React from "react";
 import { Pressable, View } from "react-native";
-import { ProgressChart } from "react-native-chart-kit";
+import * as Progress from "react-native-progress";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
@@ -34,21 +34,14 @@ const LabelCard = ({
       />
       <View className=" relative w-[60px] h-[60px] ">
         {percent <= 1 ? (
-          <ProgressChart
-            data={{ data: [percent] }}
-            width={60}
-            height={60}
-            strokeWidth={10}
-            radius={25}
-            hideLegend={true}
-            chartConfig={{
-              backgroundColor: "#FFFFFF",
-              backgroundGradientFrom: "#FFFFFF",
-              backgroundGradientTo: "#FFFFFF",
-              backgroundGradientFromOpacity: 0,
-              backgroundGradientToOpacity: 0,
-              color: (opacity = 1) => `rgba(0,0,0, ${opacity * 1.5})`,
-            }}
+          <Progress.Circle
+            size={60}
+            progress={percent}
+            borderWidth={0}
+            unfilledColor="rgba(0,0,0,0.2)"
+            color="rgba(0,0,0,1)"
+            strokeCap="round"
+            thickness={6}
           />
         ) : (
           <View className={` w-[60px] h-[60px] rounded-[50%] bg-error `} />

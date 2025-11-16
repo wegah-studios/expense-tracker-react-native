@@ -1,9 +1,9 @@
-import db, { DB_INTEGRITY, schema } from "@/db/schema";
+import db, { DB_INTEGRITY } from "@/db/schema";
 import { Expense, ManifestEntry } from "@/types/common";
 import CryptoJS from "crypto-js";
 import dayjs from "dayjs";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
@@ -13,7 +13,7 @@ import XLSX from "xlsx";
 import { parseExcelFile, parsePdfText } from "./expenseUtils";
 import { requestMediaLibraryPermissions } from "./imageUtils";
 
-const INTEGRITY_HASH = DB_INTEGRITY
+const INTEGRITY_HASH = DB_INTEGRITY;
 const IMAGES_PATH = `${FileSystem.documentDirectory}images`;
 const EXPORTS_PATH = `${FileSystem.cacheDirectory}exports`;
 const IMPORTS_PATH = `${FileSystem.cacheDirectory}imports`;

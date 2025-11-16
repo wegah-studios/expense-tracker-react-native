@@ -40,7 +40,7 @@ const ImportFileModal = ({
     }
   };
 
-  const onSubmit = () => { 
+  const onSubmit = () => {
     if (file) {
       handleSubmit(file.uri);
       setFile(null);

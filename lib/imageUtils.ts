@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 
@@ -46,7 +46,7 @@ export const saveImage = async (uri: string, fileName: string) => {
   });
 
   //delete from cache
-  await FileSystem.deleteAsync(uri, {idempotent:true});
+  await FileSystem.deleteAsync(uri, { idempotent: true });
   return fileName;
 };
 

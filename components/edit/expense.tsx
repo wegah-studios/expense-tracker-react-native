@@ -21,7 +21,7 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ToastAndroid, View } from "react-native";
 import MoveModal from "../expenses/moveModal";
@@ -489,7 +489,9 @@ const EditExpense = (props: Record<string, any>) => {
             />
             <ThemedText
               toggleOnDark={!noCollection}
-              className={` flex-1 capitalize ${noCollection ? "text-divider" : ""} `}
+              className={` flex-1 capitalize ${
+                noCollection ? "text-divider" : ""
+              } `}
             >
               {noCollection ? "No collection selected" : form.collection}
             </ThemedText>
