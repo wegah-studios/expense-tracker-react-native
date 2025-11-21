@@ -9,7 +9,10 @@ export const startSMSCapture = async () => {
   console.log("start sms capture");
   const permitted = await requestSmsPermissions();
   if (!permitted) {
-    throw new Error("Permission denied.", { cause: 1 });
+    throw new Error(
+      "SMS Permission denied. Enable SMS permissions to access this feature.",
+      { cause: 1 }
+    );
   }
   await startCapture("MPESA", "(?i)(sent to|paid to|you bought|withdraw)");
   await setPreferences({ smsCapture: "on" });

@@ -12,7 +12,6 @@ const NotificationIcon = () => {
     const handleShowBadge = async () => {
       try {
         const result = await checkForUnread();
-        console.log(result);
         setShowBadge(result);
       } catch (error) {
         toastError(error);

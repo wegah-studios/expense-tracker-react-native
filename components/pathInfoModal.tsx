@@ -1,5 +1,6 @@
 import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
+import { useCustomThemeContext } from "@/context/themeContext";
 import { toastError } from "@/lib/appUtils";
 import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
 import { usePathname } from "expo-router";
@@ -18,7 +19,7 @@ const PathInfoModal = () => {
         {
           icon: icons.logo,
           title: `Welcome to Qwantu - Expense tracker`,
-          description: `The app captures expenses and allows you to accurately track your spending, it also has insights and tracks budgets for you and much more.`,
+          description: `The app automatically captures expenses from Mpesa and allows you to accurately track your spending and budgets, you can also view insights on your spending and much more.`,
         },
         {
           icon: icons.logo,
@@ -56,8 +57,10 @@ const PathInfoModal = () => {
     []
   );
 
-  const { showPathInfo } = useEditingContext();
+  const { smsCaptureState } = useCustomThemeContext();
+  const { showPathInfo, setSmsRequestModal } = useEditingContext();
   const pathname = usePathname();
+
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<boolean>(false);
   const [step, setStep] = useState<number>(0);
@@ -99,7 +102,18 @@ const PathInfoModal = () => {
         fetchPreferences();
       }
     }
-  }, [pathname, showPathInfo]);
+  }, [pathname, showPathInfo, seen]);
+
+  useEffect(() => {
+    if (seen.size === 1 && !open && showPathInfo && smsCaptureState === null) {
+      setSmsRequestModal(true);
+      setSeen((prev) => {
+        const newSet = new Set(prev);
+        newSet.add("sms");
+        return newSet;
+      });
+    }
+  }, [open, seen, showPathInfo, smsCaptureState]);
 
   const handleClose = () => {
     try {

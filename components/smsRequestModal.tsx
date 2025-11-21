@@ -1,5 +1,5 @@
 import icons from "@/constants/icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
@@ -13,10 +13,37 @@ const SmsRequestModal = ({
   handleClose: (dnd: boolean) => void;
   handleSubmit: () => void;
 }) => {
+  const [step, setStep] = useState<number>(0);
   const [dnd, setdnd] = useState<boolean>(false);
+  const steps = useMemo<{ title: string; description: string }[]>(
+    () => [
+      {
+        title: "Automatic expense capture",
+        description:
+          "This feature allows the app to automatically capture and track expenses directly from your sms messages. Enable it to track your spending with ease.",
+      },
+      {
+        title: "SMS Permission request",
+        description:
+          "Automatic expense capture needs access to your sms messages to capture messages from 'Mpesa' you can disable this at any time in the settings.",
+      },
+    ],
+    []
+  );
+  const content = useMemo(() => steps[step], [step, steps]);
 
   const onClose = async () => {
     handleClose(dnd);
+  };
+
+  const handlePress = () => {
+    if (step < 1) {
+      setStep(1);
+    } else {
+      handleSubmit();
+      setStep(0);
+      setdnd(false);
+    }
   };
 
   return (
@@ -37,23 +64,23 @@ const SmsRequestModal = ({
         >
           <ThemedIcon source={icons.sms} className=" w-[30px] h-[30px]" />
           <ThemedText className=" font-urbanistBold text-[1.5rem] text-center ">
-            Automatic expense capture
+            {content.title}
           </ThemedText>
           <ThemedText className=" tracking-[0.1em] text-center text-[1.2rem] ">
-            This feature allows the app to automatically capture and track
-            expenses directly from your sms messages. Enable it to track your
-            spending with ease.
+            {content.description}
           </ThemedText>
-          <Pressable
-            className=" flex-row gap-2 items-center "
-            onPress={() => setdnd((prev) => !prev)}
-          >
-            <ThemedIcon
-              source={icons.checkbox[dnd ? "checked" : "unchecked"]}
-              className=" w-[20px] h-[20px] "
-            />
-            <ThemedText>Don't ask again</ThemedText>
-          </Pressable>
+          {step === 0 && (
+            <Pressable
+              className=" flex-row gap-2 items-center "
+              onPress={() => setdnd((prev) => !prev)}
+            >
+              <ThemedIcon
+                source={icons.checkbox[dnd ? "checked" : "unchecked"]}
+                className=" w-[20px] h-[20px] "
+              />
+              <ThemedText>Don't ask again</ThemedText>
+            </Pressable>
+          )}
           <View className={` w-[100%] flex-row justify-between `}>
             <Pressable
               onPress={onClose}
@@ -62,10 +89,10 @@ const SmsRequestModal = ({
               <ThemedText>Cancel</ThemedText>
             </Pressable>
             <Pressable
-              onPress={handleSubmit}
+              onPress={handlePress}
               className={` flex-row gap-2 p-[20px] pt-[10px] pb-[10px] rounded-[20px] bg-black dark:bg-white `}
             >
-              <ThemedText reverse>Enable</ThemedText>
+              <ThemedText reverse>{step === 1 ? "Allow" : "Enable"}</ThemedText>
             </Pressable>
           </View>
         </Pressable>

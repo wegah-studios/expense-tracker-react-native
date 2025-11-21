@@ -29,7 +29,7 @@ const Profile = () => {
     handleStatusClose,
     setFeedbackModal,
     setPinModal,
-    handleSmsCapture,
+    setSmsRequestModal,
   } = useEditingContext();
   const {
     theme,
@@ -88,48 +88,47 @@ const Profile = () => {
   };
 
   const toggleSmsCapture = async () => {
-    try {
-      setStatus({
-        open: true,
-        type: "loading",
-        title: isSmsCapture ? "Disable capture" : "Enable capture",
-        message: `Turning ${isSmsCapture ? "off" : "on"} sms capture`,
-        handleClose: handleStatusClose,
-        action: {
-          callback() {},
-        },
-      });
-      if (isSmsCapture) {
-        await updateSmsCaptureState("off");
-      } else {
-        await updateSmsCaptureState("on");
-      }
-      setStatus({
-        open: true,
-        type: "success",
-        message: `SMS capture turned ${isSmsCapture ? "off" : "on"}`,
-        handleClose: handleStatusClose,
-        action: {
-          callback() {
-            handleStatusClose();
-            handleSmsCapture();
+    if (isSmsCapture) {
+      try {
+        setStatus({
+          open: true,
+          type: "loading",
+          title: "Disable capture",
+          message: `Turning off sms capture`,
+          handleClose: handleStatusClose,
+          action: {
+            callback() {},
           },
-        },
-      });
-    } catch (error: any) {
-      toastError(error);
-      setStatus({
-        open: true,
-        type: "error",
-        message:
-          error.cause === 1
-            ? error.message
-            : "An error occured while updating sms capture, please try again",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
+        });
+        await updateSmsCaptureState("off");
+        setStatus({
+          open: true,
+          type: "success",
+          message: `SMS capture turned off`,
+          handleClose: handleStatusClose,
+          action: {
+            callback() {
+              handleStatusClose()
+            },
+          },
+        });
+      } catch (error: any) {
+        toastError(error);
+        setStatus({
+          open: true,
+          type: "error",
+          message:
+            error.cause === 1
+              ? error.message
+              : "An error occured while updating sms capture, please try again",
+          handleClose: handleStatusClose,
+          action: {
+            callback: handleStatusClose,
+          },
+        });
+      }
+    } else {
+      setSmsRequestModal(true);
     }
   };
 

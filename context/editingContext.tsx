@@ -36,6 +36,7 @@ const EditingContext = createContext<{
   close: () => void;
   showPathInfo: boolean;
   setStatus: React.Dispatch<React.SetStateAction<Status>>;
+  setSmsRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
   setPinModal: React.Dispatch<
     React.SetStateAction<{
       mode: "enter" | "create" | "";
@@ -46,7 +47,6 @@ const EditingContext = createContext<{
   setAddExpenseModal: React.Dispatch<React.SetStateAction<boolean>>;
   setFeedbackModal: React.Dispatch<React.SetStateAction<boolean>>;
   handleStatusClose: () => void;
-  handleSmsCapture: (requestIfNull?: boolean | undefined) => Promise<void>;
 } | null>(null);
 
 export const useEditingContext = () => {
@@ -67,7 +67,7 @@ export const EditingContexProvider = ({
   const pathname = usePathname();
   const params = useLocalSearchParams();
 
-  const { smsCaptureState, updateSmsCaptureState, pinProtected } =
+  const { smsCaptureState, pinProtected, updateSmsCaptureState } =
     useCustomThemeContext();
   const [addExpenseModal, setAddExpenseModal] = useState<boolean>(false);
   const [feedbackModal, setFeedbackModal] = useState<boolean>(false);
@@ -104,7 +104,7 @@ export const EditingContexProvider = ({
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         handleOnActive();
-      } else if (nextAppState === "background") {
+      } else {
         removeMessageCapturedListener();
       }
     });
@@ -112,31 +112,28 @@ export const EditingContexProvider = ({
     return () => subscription.remove();
   }, []);
 
-  const handleSmsCapture = useCallback(
-    async (requestIfNull?: boolean) => {
-      if (smsCaptureState === "on") {
-        addOnMessageCapturedListener((message) => {
-          const onSmsEvent = async () => {
-            try {
-              await handleSmsEvent(message);
-              await deleteReceipt(message.id);
-              ToastAndroid.show(
-                "New expense imported, reload to see changes",
-                ToastAndroid.LONG
-              );
-            } catch (error) {
-              toastError(error, "An error occured while adding new expense");
-            }
-          };
-          onSmsEvent();
-        });
-        await fetchMessages();
-      } else if (smsCaptureState === null && requestIfNull) {
-        setSmsRequestModal(true);
-      }
-    },
-    [smsCaptureState]
-  );
+  const handleSmsCapture = useCallback(async () => {
+    if (smsCaptureState === "on") {
+      addOnMessageCapturedListener((message) => {
+        const onSmsEvent = async () => {
+          try {
+            await handleSmsEvent(message);
+            await deleteReceipt(message.id);
+            ToastAndroid.show(
+              "New expense imported, reload to see changes",
+              ToastAndroid.LONG
+            );
+          } catch (error) {
+            toastError(error, "An error occured while adding new expense");
+          }
+        };
+        onSmsEvent();
+      });
+      await fetchMessages();
+    } else {
+      setShowPathInfo(true);
+    }
+  }, [smsCaptureState]);
 
   const handleOnActive = () => {
     setShowPathInfo(false);
@@ -152,11 +149,11 @@ export const EditingContexProvider = ({
         mode: "enter",
         onComplete() {
           setPinModal({ mode: "" });
-          handleSmsCapture(true);
+          handleSmsCapture();
         },
       });
     } else {
-      handleSmsCapture(true);
+      handleSmsCapture();
     }
   }, [pinProtected]);
 
@@ -242,6 +239,72 @@ export const EditingContexProvider = ({
     }
   };
 
+  const handleSmsRequestSubmit = async () => {
+    setSmsRequestModal(false);
+    try {
+      setStatus({
+        open: true,
+        type: "loading",
+        message: "Enabling automatic expense capture.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+      await updateSmsCaptureState("on");
+      setStatus({
+        open: true,
+        type: "success",
+        title: "Automatic Capture enabled",
+        message: "Automatic expense capture is now ebabled.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: () => {
+            handleStatusClose();
+            handleSmsCapture();
+          },
+        },
+      });
+    } catch (error: any) {
+      toastError(error);
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          error.cause === 1
+            ? error.message
+            : "An error occured while enabling auto expense capture.",
+        handleClose: handleStatusClose,
+        action: {
+          callback() {
+            handleStatusClose();
+          },
+        },
+      });
+    }
+  };
+
+  const handleSmsRequestClose = async (dnd: boolean) => {
+    if (dnd) {
+      try {
+        setStatus({
+          open: true,
+          type: "loading",
+          message: "please wait.",
+          handleClose: handleStatusClose,
+          action: {
+            callback: handleStatusClose,
+          },
+        });
+        await updateSmsCaptureState("dnd");
+        handleStatusClose();
+      } catch (error) {
+        toastError(error);
+      }
+    }
+    setSmsRequestModal(false);
+  };
+
   const open = (props: EditingContextProps) => {
     setProps({ ...props, close, setStatus, handleStatusClose });
     ref.current?.snapToIndex(0);
@@ -273,74 +336,6 @@ export const EditingContexProvider = ({
     });
   };
 
-  const handleSmsRequestSubmit = async () => {
-    setSmsRequestModal(false);
-    try {
-      setStatus({
-        open: true,
-        type: "loading",
-        message: "Enabling automating expense capture.",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
-      await updateSmsCaptureState("on");
-      setStatus({
-        open: true,
-        type: "success",
-        title: "Automatic Capture enabled",
-        message: "Automatic expense capture is now ebabled.",
-        handleClose: handleStatusClose,
-        action: {
-          callback: () => {
-            handleStatusClose();
-            handleSmsCapture();
-            setShowPathInfo(true);
-          },
-        },
-      });
-    } catch (error: any) {
-      setStatus({
-        open: true,
-        type: "error",
-        message:
-          error.cause === 1
-            ? error.message
-            : "An error occured while enabling auto expense capture.",
-        handleClose: handleStatusClose,
-        action: {
-          callback() {
-            handleStatusClose();
-            setShowPathInfo(true);
-          },
-        },
-      });
-    }
-  };
-
-  const handleSmsRequestClose = async (dnd: boolean) => {
-    if (dnd) {
-      try {
-        setStatus({
-          open: true,
-          type: "loading",
-          message: "please wait.",
-          handleClose: handleStatusClose,
-          action: {
-            callback: handleStatusClose,
-          },
-        });
-        await updateSmsCaptureState("dnd");
-        handleStatusClose();
-      } catch (error) {
-        toastError(error);
-      }
-    }
-    setSmsRequestModal(false);
-    setShowPathInfo(true);
-  };
-
   return (
     <EditingContext.Provider
       value={{
@@ -349,10 +344,10 @@ export const EditingContexProvider = ({
         showPathInfo,
         setStatus,
         setPinModal,
+        setSmsRequestModal,
         handleStatusClose,
         setAddExpenseModal,
         setFeedbackModal,
-        handleSmsCapture,
       }}
     >
       {children}
@@ -373,11 +368,7 @@ export const EditingContexProvider = ({
         open={feedbackModal}
         handleClose={() => setFeedbackModal(false)}
       />
-      <SmsRequestModal
-        open={smsRequestModal}
-        handleClose={handleSmsRequestClose}
-        handleSubmit={handleSmsRequestSubmit}
-      />
+
       <PinModal {...{ ...pinModal, setStatus, handleStatusClose }} />
       <AddExpenseModal
         open={addExpenseModal}
@@ -385,6 +376,11 @@ export const EditingContexProvider = ({
         setStatus={setStatus}
         handleStatusClose={handleStatusClose}
         handleClose={() => setAddExpenseModal(false)}
+      />
+      <SmsRequestModal
+        open={smsRequestModal}
+        handleClose={handleSmsRequestClose}
+        handleSubmit={handleSmsRequestSubmit}
       />
     </EditingContext.Provider>
   );

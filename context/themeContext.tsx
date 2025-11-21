@@ -64,6 +64,7 @@ export const CustomThemeContextProvider = ({
   useEffect(() => {
     try {
       const startup = async () => {
+        console.log("starting up")
         if (!mounted) {
           //init db
           await initDB();

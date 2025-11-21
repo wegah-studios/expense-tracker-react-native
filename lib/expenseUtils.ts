@@ -309,8 +309,6 @@ export const updateExpense = async (
       );
     }
 
-    console.log("fuck this shit: ", expense);
-
     const keys = Object.keys(expense);
     const values = Object.values(expense);
 

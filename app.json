@@ -2,7 +2,7 @@
   "expo": {
     "name": "Qwantu",
     "slug": "qwantu",
-    "version": "3.0.0",
+    "version": "3.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "application",
@@ -86,7 +86,9 @@
           ]
         }
       ],
-      ["./plugins/withGradleKSPSetup"],
+      [
+        "./plugins/withGradleKSPSetup"
+      ],
       "expo-mail-composer",
       "expo-web-browser"
     ],
@@ -98,4 +100,3 @@
     }
   }
 }
-
