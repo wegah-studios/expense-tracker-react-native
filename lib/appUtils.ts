@@ -32,7 +32,7 @@ export const normalizeString = (str: string) => {
 
 export const formatAmount = (amount: number, max: number = 1000) => {
   let suffix = "";
-  if (amount > max) {
+  if (amount >= max) {
     if (amount > 1000000000) {
       suffix = "B";
       amount = amount / 1000000000;

@@ -108,7 +108,7 @@ const Profile = () => {
           handleClose: handleStatusClose,
           action: {
             callback() {
-              handleStatusClose()
+              handleStatusClose();
             },
           },
         });
@@ -128,7 +128,7 @@ const Profile = () => {
         });
       }
     } else {
-      setSmsRequestModal(true);
+      setSmsRequestModal("toggle");
     }
   };
 

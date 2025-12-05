@@ -36,7 +36,9 @@ const EditingContext = createContext<{
   close: () => void;
   showPathInfo: boolean;
   setStatus: React.Dispatch<React.SetStateAction<Status>>;
-  setSmsRequestModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setSmsRequestModal: React.Dispatch<
+    React.SetStateAction<"request" | "toggle" | "">
+  >;
   setPinModal: React.Dispatch<
     React.SetStateAction<{
       mode: "enter" | "create" | "";
@@ -84,7 +86,9 @@ export const EditingContexProvider = ({
     type: "",
     snapPoints: ["75%"],
   });
-  const [smsRequestModal, setSmsRequestModal] = useState<boolean>(false);
+  const [smsRequestModal, setSmsRequestModal] = useState<
+    "request" | "toggle" | ""
+  >("");
   const [pinModal, setPinModal] = useState<{
     mode: "enter" | "create" | "";
     onComplete?: () => void;
@@ -202,11 +206,11 @@ export const EditingContexProvider = ({
           title: "Expenses imported",
           message: `New expenses imported:${
             report.complete
-              ? `\n\n✅ ${report.complete} successfully added.`
+              ? `\n\n^icon|success^ ${report.complete} successfully added.`
               : ""
           }${
             report.incomplete
-              ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+              ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
               : ""
           }`,
           handleClose: handleStatusClose,
@@ -240,7 +244,7 @@ export const EditingContexProvider = ({
   };
 
   const handleSmsRequestSubmit = async () => {
-    setSmsRequestModal(false);
+    setSmsRequestModal("");
     try {
       setStatus({
         open: true,
@@ -302,7 +306,7 @@ export const EditingContexProvider = ({
         toastError(error);
       }
     }
-    setSmsRequestModal(false);
+    setSmsRequestModal("");
   };
 
   const open = (props: EditingContextProps) => {
@@ -378,7 +382,7 @@ export const EditingContexProvider = ({
         handleClose={() => setAddExpenseModal(false)}
       />
       <SmsRequestModal
-        open={smsRequestModal}
+        mode={smsRequestModal}
         handleClose={handleSmsRequestClose}
         handleSubmit={handleSmsRequestSubmit}
       />

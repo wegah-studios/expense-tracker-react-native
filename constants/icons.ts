@@ -68,6 +68,7 @@ const icons = {
     },
   },
   receipt: require("../assets/images/receipt.png"),
+  report: require("../assets/images/report.png"),
   restore: require("../assets/images/restore.png"),
   arrow: require("../assets/images/arrow.png"),
   search: require("../assets/images/search.png"),

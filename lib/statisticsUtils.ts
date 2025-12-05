@@ -82,10 +82,7 @@ export const fetchInsightTrends = async (
     const selectedOptions = options.get(key);
     if (selectedOptions && selectedOptions.length > 1) {
       trends.push({
-        title: `-Ksh ${formatAmount(
-          insight.total / selectedOptions.length,
-          10000
-        )}`,
+        title: `-Ksh ${formatAmount(insight.total / selectedOptions.length)}`,
         description: `per ${
           !insight.path[0].length
             ? "year"

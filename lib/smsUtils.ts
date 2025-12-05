@@ -1,3 +1,4 @@
+import { PermissionsAndroid, Platform } from "react-native";
 import {
   requestSmsPermissions,
   startCapture,
@@ -21,4 +22,14 @@ export const startSMSCapture = async () => {
 export const stopSMSCapture = async () => {
   await stopCapture();
   await setPreferences({ smsCapture: "off" });
+};
+
+export const hasSmsPermission = async () => {
+  if (Platform.OS !== "android") return false;
+
+  const granted = await PermissionsAndroid.check(
+    PermissionsAndroid.PERMISSIONS.RECEIVE_SMS
+  );
+
+  return granted; // true or false
 };

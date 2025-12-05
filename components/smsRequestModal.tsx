@@ -1,20 +1,23 @@
 import icons from "@/constants/icons";
-import React, { useMemo, useState } from "react";
+import { toastError } from "@/lib/appUtils";
+import { hasSmsPermission } from "@/lib/smsUtils";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
 
 const SmsRequestModal = ({
-  open,
+  mode,
   handleClose,
   handleSubmit,
 }: {
-  open: boolean;
+  mode: "request" | "toggle" | "";
   handleClose: (dnd: boolean) => void;
   handleSubmit: () => void;
 }) => {
   const [step, setStep] = useState<number>(0);
   const [dnd, setdnd] = useState<boolean>(false);
+  const [permited, setPermited] = useState<boolean>(false);
   const steps = useMemo<{ title: string; description: string }[]>(
     () => [
       {
@@ -32,25 +35,39 @@ const SmsRequestModal = ({
   );
   const content = useMemo(() => steps[step], [step, steps]);
 
+  useEffect(() => {
+    if (mode) {
+      const checkPermited = async () => {
+        try {
+          const result = await hasSmsPermission();
+          setPermited(result);
+        } catch (error) {
+          toastError(error);
+        }
+      };
+      checkPermited();
+    }
+  }, [mode]);
+
   const onClose = async () => {
     handleClose(dnd);
   };
 
-  const handlePress = () => {
-    if (step < 1) {
+  const handlePress = useCallback(async () => {
+    if (!permited && step < 1) {
       setStep(1);
     } else {
-      handleSubmit();
       setStep(0);
       setdnd(false);
+      handleSubmit();
     }
-  };
+  }, [permited, step]);
 
   return (
     <Modal
       animationType="fade"
       transparent={true}
-      visible={open}
+      visible={!!mode}
       onRequestClose={onClose}
     >
       <Pressable
@@ -69,7 +86,7 @@ const SmsRequestModal = ({
           <ThemedText className=" tracking-[0.1em] text-center text-[1.2rem] ">
             {content.description}
           </ThemedText>
-          {step === 0 && (
+          {step === 0 && mode === "request" && (
             <Pressable
               className=" flex-row gap-2 items-center "
               onPress={() => setdnd((prev) => !prev)}

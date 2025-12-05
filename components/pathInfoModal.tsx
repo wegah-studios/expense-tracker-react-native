@@ -106,7 +106,7 @@ const PathInfoModal = () => {
 
   useEffect(() => {
     if (seen.size === 1 && !open && showPathInfo && smsCaptureState === null) {
-      setSmsRequestModal(true);
+      setSmsRequestModal("request");
       setSeen((prev) => {
         const newSet = new Set(prev);
         newSet.add("sms");

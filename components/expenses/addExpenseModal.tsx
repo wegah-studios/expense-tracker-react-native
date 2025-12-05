@@ -87,10 +87,12 @@ const AddExpenseModal = ({
       type: "info",
       title: "Expenses imported",
       message: `New expenses imported:${
-        report.complete ? `\n\n✅ ${report.complete} successfully added.` : ""
+        report.complete
+          ? `\n\n^icon|success^ ${report.complete} successfully added.`
+          : ""
       }${
         report.incomplete
-          ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+          ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
           : ""
       }`,
       handleClose: handleStatusClose,
@@ -167,10 +169,12 @@ const AddExpenseModal = ({
         type: "info",
         title: "Expenses imported",
         message: `New expenses imported:${
-          report.complete ? `\n\n✅ ${report.complete} successfully added.` : ""
+          report.complete
+            ? `\n\n^icon|success^ ${report.complete} successfully added.`
+            : ""
         }${
           report.incomplete
-            ? `\n\n❌ ${report.incomplete} incomplete expenses.`
+            ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
             : ""
         }`,
         handleClose: handleStatusClose,

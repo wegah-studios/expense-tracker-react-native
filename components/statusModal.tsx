@@ -1,13 +1,36 @@
 import { tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { Status } from "@/types/common";
-import React from "react";
+import React, { useMemo } from "react";
 import { Image, Modal, Pressable, View } from "react-native";
 import * as Progress from "react-native-progress";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
 
 const StatusModal = ({ status }: { status: Status }) => {
+  const messageParts = useMemo(
+    () =>
+      status.message?.split("^").map((part, index) => {
+        const [a, b] = part.split("|");
+        if (b) {
+          return (
+            <View key={index} className="  ">
+              <Image
+                source={icons[b as keyof typeof icons]}
+                tintColor={tintColors[b as keyof typeof tintColors] as any}
+                className=" w-[15px] h-[15px] "
+              />
+            </View>
+          );
+        }
+        return (
+          <ThemedText key={index} className=" text-[1.2rem] ">
+            {a}
+          </ThemedText>
+        );
+      }) || [],
+    [status.message]
+  );
   const handleCancel = () => {
     if (
       status.type === "info" ||
@@ -68,8 +91,8 @@ const StatusModal = ({ status }: { status: Status }) => {
                 <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
               )}
               {status.message && (
-                <ThemedText className=" text-[1.2rem] ">
-                  {status.message}
+                <ThemedText className=" flex-row items-center gap-1  flex-wrap ">
+                  {messageParts}
                 </ThemedText>
               )}
             </View>
