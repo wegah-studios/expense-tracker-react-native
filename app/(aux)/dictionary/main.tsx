@@ -1,12 +1,13 @@
+import FormattedText from "@/components/formattedText";
 import ThemedText from "@/components/textThemed";
 import ThemedIcon from "@/components/themedIcon";
 import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
 import { toastError } from "@/lib/appUtils";
 import { getDictionaryCollections } from "@/lib/dictionaryUtils";
-import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
+import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Image,
   Pressable,
@@ -24,15 +25,23 @@ const Dictionary = () => {
   const [showInfo, setShowInfo] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const info = useMemo(
+    () =>
+      `The dictionary is used to ^b|automaticaly^ assign ^b|labels^ to an expense, when ^b|importing^ from ^b|Mpesa^.` +
+      `\n\n^b|Keywords^ \nThese assign ^b|labels^ if the ^b|expense^ contains a given ^b|keyword^. (e.g. 'mart' -> 'Quickmart Kilimani')` +
+      `\n\n^b|Recipients^ \nThese assign ^b|labels^ if the ^b|expense^ is an ^b|exact match^. (e.g. 'Quickmart Kilimani' -> 'Quickmart Kilimani')`,
+    []
+  );
+
   useEffect(() => {
     const fetchCollections = async () => {
       try {
-        const [data, preferences] = await Promise.all([
-          getDictionaryCollections(),
-          getPreferences("disableDictionaryInfo"),
-        ]);
+        const data = await getDictionaryCollections();
         setCollections(data);
-        if (!preferences.disableDictionaryInfo) {
+
+        const storage = await getStoreItems("disableDictionaryInfo");
+
+        if (!storage.disableDictionaryInfo) {
           setShowInfo(true);
         }
       } catch (error) {
@@ -57,7 +66,7 @@ const Dictionary = () => {
   };
 
   const handleGotIt = async () => {
-    setPreferences({ disableDictionaryInfo: "true" });
+    setStoreItems([["disableDictionaryInfo", "true"]]);
     setShowInfo(false);
   };
 
@@ -94,98 +103,13 @@ const Dictionary = () => {
           {showInfo && (
             <View className=" p-[20px] bg-primary rounded-[20px] flex-col gap-4 items-start  ">
               <Image source={icons.info} className=" w-[20px] h-[20px] " />
-              <View>
-                <ThemedText
-                  toggleOnDark={false}
-                  className=" font-urbanistBold text-[1.2rem] "
-                >
-                  Keywords
-                </ThemedText>
-                <ThemedText toggleOnDark={false} className=" text-[1.1rem] ">
-                  These are used to{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    automaticaly
-                  </ThemedText>{" "}
-                  assign{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    labels
-                  </ThemedText>{" "}
-                  to an expense, when{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    importing
-                  </ThemedText>{" "}
-                  from mpesa, if the{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    recipient
-                  </ThemedText>{" "}
-                  contains a given{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    keyword
-                  </ThemedText>
-                  . (e.g. 'mart' {"->"} 'Quickmart Kilimani')
-                </ThemedText>
-              </View>
-              <View>
-                <ThemedText
-                  toggleOnDark={false}
-                  className=" font-urbanistBold text-[1.2rem] "
-                >
-                  Recipients
-                </ThemedText>
-                <ThemedText toggleOnDark={false} className=" text-[1.1rem]">
-                  These are used to{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    automaticaly
-                  </ThemedText>{" "}
-                  assign{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    labels
-                  </ThemedText>{" "}
-                  to an expense, when{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    importing
-                  </ThemedText>{" "}
-                  from mpesa, if the{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    recipient
-                  </ThemedText>{" "}
-                  is an{" "}
-                  <ThemedText
-                    toggleOnDark={false}
-                    className=" font-urbanistBold "
-                  >
-                    exact match
-                  </ThemedText>
-                  . (e.g. 'Quickmart Kilimani' {"->"} 'Quickmart Kilimani')
-                </ThemedText>
-              </View>
+              <FormattedText
+                text={info}
+                props={{
+                  container: { toggleOnDark: false },
+                  text: { toggleOnDark: false },
+                }}
+              />
               <Pressable
                 onPress={handleGotIt}
                 className=" p-[20px] pt-[5px] pb-[5px] bg-black rounded-[20px] "

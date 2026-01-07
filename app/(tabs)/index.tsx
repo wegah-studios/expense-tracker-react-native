@@ -1,3 +1,4 @@
+import HelpFab from "@/components/helpFab";
 import HomeExpenseWidget from "@/components/home/expenseWidget";
 import NotificationIcon from "@/components/home/notificationIcon";
 import HomeStatisticsWidget from "@/components/home/statisticsWidget";
@@ -50,6 +51,7 @@ const Home = () => {
               />
             </Pressable>
           </Link>
+          <HelpFab staticMode />
         </View>
       </View>
       <ScrollView

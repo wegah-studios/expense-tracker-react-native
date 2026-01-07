@@ -1,5 +1,10 @@
-import db from "@/db/schema";
+import db from "@/db/db";
 import { Collection, Expense } from "@/types/common";
+import {
+  deleteCollectionsQuery,
+  setCollectionCountQuery,
+  updateCollectionsQuery,
+} from "./queries";
 
 export const getCollections = async () => {
   const data: Collection[] = await db.getAllAsync(
@@ -7,39 +12,30 @@ export const getCollections = async () => {
   );
   let map: Map<string, number> = new Map();
   let names: string[] = [];
+  let exclusions: string[] = [];
 
   for (let item of data) {
-    map.set(item.name, item.count);
+    let name = item.name;
     if (
-      item.name !== "expenses" &&
-      item.name !== "failed" &&
-      item.name !== "trash" &&
-      item.name !== "keywords" &&
-      item.name !== "recipients"
+      ![
+        "expenses",
+        "failed",
+        "trash",
+        "keywords",
+        "recipients",
+        "exclusions",
+      ].includes(item.name)
     ) {
-      names.push(item.name);
+      if (item.name.startsWith("exclusion/")) {
+        name = item.name.replace("exclusion/", "");
+        exclusions.push(name);
+      } else {
+        names.push(item.name);
+      }
     }
+    map.set(name, item.count);
   }
-  return { map, names };
-};
-
-export const addToCollection = async (collection: string) => {
-  await db.runAsync(
-    `
-  INSERT INTO collections (name, count)
-  VALUES (?, 1)
-  ON CONFLICT(name)
-  DO UPDATE SET count = count + 1;
-  `,
-    [collection]
-  );
-};
-
-export const removeFromCollection = async (collection: string) => {
-  await db.runAsync(
-    `UPDATE collections SET count = count - 1 WHERE name = ?`,
-    collection
-  );
+  return { map, names, exclusions };
 };
 
 export const createCollection = async (collection: string) => {
@@ -53,21 +49,8 @@ export const deleteCollections = async (
   selected: Set<string>,
   collections: { map: Map<string, number>; names: string[] }
 ) => {
-  let params = [...selected];
-  await Promise.all([
-    db.runAsync(
-      `UPDATE expenses SET collection = "expenses" WHERE collection IN (?${`, ?`.repeat(
-        params.length - 1
-      )});`,
-      params
-    ),
-    db.runAsync(
-      `DELETE FROM collections WHERE name IN (?${`, ?`.repeat(
-        params.length - 1
-      )});`,
-      params
-    ),
-  ]);
+  let names = [...selected];
+  let query = deleteCollectionsQuery(names);
 
   collections.map = new Map(collections.map);
   collections.names = collections.names.filter((name) => {
@@ -79,6 +62,8 @@ export const deleteCollections = async (
     }
   });
 
+  await db.execAsync(query);
+
   return collections;
 };
 
@@ -88,55 +73,56 @@ export const updateCollections = async (
   collections: {
     map: Map<string, number>;
     names: string[];
-  },
+    exclusions: string[];
+},
   expenses: Partial<Expense>[],
   isExpenses: boolean = false
 ) => {
   collections.map = new Map(collections.map);
 
-  let promises = [];
+  let query = "";
   let ids: string[] = [];
+  let filtered: Partial<Expense>[] = [];
+  let decrements: Set<string> = new Set();
 
-  expenses = expenses.filter((expense, index) => {
-    if (selected.has(index)) {
-      if (expense.collection) {
-        ids.push(expense.id || "");
-        if (expense.collection !== "expenses") {
-          promises.push(removeFromCollection(expense.collection || ""));
-          collections.map.set(
-            expense.collection,
-            (collections.map.get(expense.collection) || 1) - 1
-          );
-        }
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < expenses.length; i++) {
+      const expense = expenses[i];
+      if (selected.has(i)) {
+        if (expense.collection) {
+          ids.push(expense.id || "");
+          if (expense.collection !== "expenses") {
+            decrements.add(expense.collection);
+            collections.map.set(
+              expense.collection,
+              (collections.map.get(expense.collection) || 1) - 1
+            );
+          }
 
-        if (isExpenses) {
-          expense.collection = collection;
-          return true;
-        } else {
-          return false;
+          if (isExpenses) {
+            expense.collection = collection;
+            filtered.push(expense);
+          }
         }
+      } else {
+        filtered.push(expense);
       }
-    } else {
-      return true;
     }
   });
-  promises.push(
-    db.runAsync(
-      `UPDATE expenses SET collection = ? WHERE id IN (?${`, ?`.repeat(
-        ids.length - 1
-      )});`,
-      [collection, ...ids]
-    ),
-    db.runAsync(
-      `UPDATE collections SET count = count + ${ids.length} WHERE name = ?`,
-      collection
-    )
-  );
+
   collections.map.set(
     collection,
     (collections.map.get(collection) || 0) + ids.length
   );
-  await Promise.all(promises);
+
+  for (let decrement of decrements) {
+    const count = collections.map.get(decrement) || 0;
+    query += setCollectionCountQuery(decrement, count);
+  }
+
+  query += updateCollectionsQuery(ids, collection);
+
+  await db.execAsync(query);
 
   return { expenses, collections };
 };

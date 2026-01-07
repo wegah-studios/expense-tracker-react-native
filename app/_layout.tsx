@@ -44,12 +44,11 @@ export default function RootLayout() {
             </EditingContexProvider>
           </GestureHandlerRootView>
         </SafeAreaView>
-        
       </CustomThemeContextProvider>
     );
   } catch (error) {
     addLog({ type: "error", content: `Uncaught Error: ${error}` });
-    toastError(error,);
+    toastError(error);
     return (
       <>
         <View className=" flex-1 flex-col items-center justify-center gap-2 bg-background-light dark:bg-background-dark ">
@@ -66,7 +65,11 @@ export default function RootLayout() {
             <ThemedText reverse>Send Feedback</ThemedText>
           </Pressable>
         </View>
-        <FeedbackModal open={open} handleClose={() => setOpen(false)} />
+        <FeedbackModal
+          open={open}
+          handleClose={() => setOpen(false)}
+          onComplete={() => {}}
+        />
       </>
     );
   }

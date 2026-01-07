@@ -3,6 +3,10 @@ import { useAppProps } from "@/context/propContext";
 import { toastError } from "@/lib/appUtils";
 import { updateCollections } from "@/lib/collectionsUtils";
 import {
+  addExpensesToExclusions,
+  restoreExclusionExpenses,
+} from "@/lib/exclusionUtils";
+import {
   deleteExpenses,
   onExpenseUpdate,
   restoreExpenses,
@@ -18,6 +22,7 @@ const SelectActions = ({
   expenses,
   setExpenses,
   collection,
+  exclusion,
   selected,
   resetSelected,
   setSelectMode,
@@ -26,6 +31,7 @@ const SelectActions = ({
   expenses: Partial<Expense>[];
   setExpenses: React.Dispatch<React.SetStateAction<Partial<Expense>[]>>;
   collection: string;
+  exclusion?: string;
   selected: Set<number>;
   resetSelected: () => void;
   setSelectMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -57,6 +63,7 @@ const SelectActions = ({
     collections: {
       map: Map<string, number>;
       names: string[];
+      exclusions: string[];
     };
     setCollections: React.Dispatch<
       React.SetStateAction<{
@@ -90,21 +97,16 @@ const SelectActions = ({
         expenses,
         collection === "expenses"
       );
-      setExpenses(results.expenses);
-      setCollections(results.collections);
-      handleStatusClose();
-      handleReset();
+      handleResults(
+        results,
+        undefined,
+        `Selected expenses added to collection '${newCollection}'`
+      );
     } catch (error) {
-      setStatus({
-        open: true,
-        type: "error",
-        message: "An error occured while updating expenses please try again.",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
-      toastError(error);
+      handleError(
+        error,
+        "An error occured while updating expenses please try again."
+      );
     }
   };
 
@@ -133,7 +135,7 @@ const SelectActions = ({
       });
       let data: Partial<Expense>[] = [];
 
-      for (let index of [...selected]) {
+      for (let index of selected) {
         data.push(expenses[index] as Partial<Expense>);
       }
 
@@ -150,16 +152,7 @@ const SelectActions = ({
         },
       });
     } catch (error: any) {
-      setStatus({
-        open: true,
-        type: "error",
-        message: "An error occured while exporting expenses",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
-      toastError(error);
+      handleError(error, "An error occured while exporting expenses");
     }
   };
 
@@ -193,51 +186,18 @@ const SelectActions = ({
   };
 
   const handleItemUpdate = (update: Map<number, Partial<Expense>>) => {
-    const { newExpenses, newCollections } = onExpenseUpdate(
-      expenses,
-      collections,
-      update,
-      collection
-    );
-    setExpenses(newExpenses);
-    setCollections(newCollections);
-    setStatus({
-      open: true,
-      type: "success",
-      title: "Expense updated",
-      message: "Expense successfully updated",
-      handleClose: handleStatusClose,
-      action: {
-        callback() {
-          handleReset();
-          handleStatusClose();
-        },
-      },
-    });
+    const results = onExpenseUpdate(expenses, collections, update, collection);
+    handleResults(results, undefined, "Expense successfully updated");
   };
 
   const handleMultipleUpdate = (update: Map<number, Partial<Expense>>) => {
-    const { newExpenses, newCollections } = onExpenseUpdate(
-      expenses,
-      collections,
-      update,
-      collection
+    const results = onExpenseUpdate(expenses, collections, update, collection);
+
+    handleResults(
+      results,
+      undefined,
+      `${update.size} expenses successfully updated`
     );
-    setExpenses(newExpenses);
-    setCollections(newCollections);
-    setStatus({
-      open: true,
-      type: "success",
-      title: "Expenses updated",
-      message: `${update.size} expenses successfully updated`,
-      handleClose: handleStatusClose,
-      action: {
-        callback() {
-          handleReset();
-          handleStatusClose();
-        },
-      },
-    });
   };
 
   const handleRestore = async () => {
@@ -245,34 +205,42 @@ const SelectActions = ({
       setStatus({
         open: true,
         type: "loading",
-        title: "Restoring items",
-        message: "This may take a while",
+        title: "Restoring",
+        message: "Restoring selected expenses, please wait",
         handleClose: handleStatusClose,
         action: {
           callback() {},
         },
       });
 
-      const results = await restoreExpenses(selected, collections, expenses);
-      setExpenses(results.expenses);
-      setCollections(results.collections);
-      handleStatusClose();
-      handleReset();
+      let results: {
+        expenses: Partial<Expense>[];
+        collections: {
+          map: Map<string, number>;
+          names: string[];
+        };
+      };
+      if (exclusion) {
+        results = await restoreExclusionExpenses(
+          selected,
+          expenses,
+          collections,
+          exclusion
+        );
+      } else {
+        results = await restoreExpenses(selected, collections, expenses);
+      }
+
+      handleResults(results as any, undefined, `Selected expenses restored.`);
     } catch (error) {
-      setStatus({
-        open: true,
-        type: "error",
-        message: "An error occured while restoring expenses",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
-      toastError(error);
+      handleError(
+        error,
+        "An error occured while restoring expenses, please try again."
+      );
     }
   };
 
-  const onDelete = () => {
+  const handleDelete = () => {
     setStatus({
       open: true,
       type: "warning",
@@ -293,30 +261,117 @@ const SelectActions = ({
             },
           });
           try {
-            await handleDelete();
-            handleStatusClose();
-            handleReset();
+            let results: {
+              expenses: Partial<Expense>[];
+              collections: {
+                map: Map<string, number>;
+                names: string[];
+              };
+            };
+            if (exclusion) {
+              results = await restoreExclusionExpenses(
+                selected,
+                expenses,
+                collections,
+                exclusion
+              );
+            } else {
+              results = await deleteExpenses(selected, expenses, collections);
+            }
+
+            handleResults(
+              results as any,
+              undefined,
+              `Selected expenses deleted.`
+            );
           } catch (error) {
-            setStatus({
-              open: true,
-              type: "error",
-              message: "An error occured while deleting expenses",
-              handleClose: handleStatusClose,
-              action: {
-                callback: handleStatusClose,
-              },
-            });
-            toastError(error);
+            handleError(error, "An error occured while deleting expenses");
           }
         },
       },
     });
   };
 
-  const handleDelete = async () => {
-    const results = await deleteExpenses(selected, expenses, collections);
+  const moveToExclusions = async () => {
+    setStatus({
+      open: true,
+      type: "warning",
+      title: "Exclude expenses?",
+      message:
+        "Future payments sent to the selected recipients will be excluded as well.",
+      handleClose: handleStatusClose,
+      action: {
+        title: "Exclude",
+        async callback() {
+          setStatus({
+            open: true,
+            type: "loading",
+            title: "Excluding expenses",
+            message: "This may take a while",
+            handleClose: handleStatusClose,
+            action: {
+              callback() {},
+            },
+          });
+          try {
+            const results = await addExpensesToExclusions(
+              selected,
+              expenses,
+              collections
+            );
+            handleResults(
+              results,
+              "Expenses excluded",
+              "Expenses successfully added to exclusions."
+            );
+          } catch (error) {
+            handleError(error, "An error occured while excluding expenses");
+          }
+        },
+      },
+    });
+  };
+
+  const handleResults = (
+    results: {
+      expenses: Partial<Expense>[];
+      collections: {
+        map: Map<string, number>;
+        names: string[];
+        exclusions: string[];
+      };
+    },
+    title?: string,
+    message?: string
+  ) => {
     setExpenses(results.expenses);
     setCollections(results.collections);
+    setStatus({
+      open: true,
+      type: "success",
+      title,
+      message: message || "Operations complete.",
+      handleClose: handleStatusClose,
+      action: {
+        callback() {
+          handleReset();
+          handleStatusClose();
+        },
+      },
+    });
+  };
+
+  const handleError = (error: unknown, message?: string) => {
+    setStatus({
+      open: true,
+      type: "error",
+      message: message || "An error occured.",
+      handleClose: handleStatusClose,
+      action: {
+        callback: handleStatusClose,
+      },
+    });
+    toastError(error);
   };
 
   return (
@@ -325,10 +380,10 @@ const SelectActions = ({
         {collection === "failed" ? (
           <SelectAction
             type={"delete"}
-            handlePress={onDelete}
+            handlePress={handleDelete}
             disabled={selected.size < 1}
           />
-        ) : collection === "trash" ? (
+        ) : collection === "trash" || !!exclusion ? (
           <SelectAction
             type={"restore"}
             handlePress={handleRestore}
@@ -347,10 +402,10 @@ const SelectActions = ({
             handlePress={handleEdit}
             disabled={selected.size < 1}
           />
-        ) : collection === "trash" ? (
+        ) : collection === "trash" || !!exclusion ? (
           <SelectAction
             type="delete"
-            handlePress={onDelete}
+            handlePress={handleDelete}
             disabled={selected.size < 1}
           />
         ) : (
@@ -360,11 +415,11 @@ const SelectActions = ({
             disabled={selected.size < 1}
           />
         )}
-        {collection !== "trash" && collection !== "failed" && (
+        {collection !== "trash" && collection !== "failed" && !exclusion && (
           <>
             <SelectAction
               type="delete"
-              handlePress={onDelete}
+              handlePress={handleDelete}
               disabled={selected.size < 1}
             />
             <SelectAction
@@ -382,6 +437,11 @@ const SelectActions = ({
         setCollections={setCollections}
         handleClose={() => setMoveModal(false)}
         handleSubmit={handleMoveModalSubmit}
+        addToExclusions={
+          collection !== "failed" && collection !== "trash"
+            ? moveToExclusions
+            : undefined
+        }
       />
     </>
   );

@@ -11,7 +11,11 @@ import * as Progress from "react-native-progress";
 import BudgetCard from "../budget/budgetCard";
 import ThemedText from "../textThemed";
 
-const HomeBudgetWidget = ({ scope }: { scope: number }) => {
+const HomeBudgetWidget = ({
+  scope,
+}: {
+  scope: number;
+}) => {
   const { open } = useEditingContext();
   const [record, setRecord] = useState<Map<number, Budget | null>>(new Map());
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -38,7 +42,7 @@ const HomeBudgetWidget = ({ scope }: { scope: number }) => {
         toastError(error, `An error occured while fetching budget`);
       }
     };
-    fetchBudget();
+    fetchBudget()
   }, [scope]);
 
   const handlePress = () => {
@@ -56,7 +60,7 @@ const HomeBudgetWidget = ({ scope }: { scope: number }) => {
   };
 
   const handleUpdate = (result: Partial<Budget>, index: number) => {
-    setBudget(result as Budget);
+    router.replace("/");
   };
 
   return loading ? (

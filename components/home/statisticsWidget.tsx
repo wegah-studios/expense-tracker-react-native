@@ -87,7 +87,7 @@ const HomeStatisticsWidget = () => {
         toastError(error);
       }
     };
-    handleScopeChange();
+    handleScopeChange()
   }, [scope]);
 
   const handlePress = () => {

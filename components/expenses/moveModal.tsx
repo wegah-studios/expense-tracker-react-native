@@ -13,12 +13,14 @@ const MoveModal = ({
   open,
   collection,
   collections,
+  addToExclusions,
   setCollections,
   handleClose,
   handleSubmit,
 }: {
   open: boolean;
   collection?: string;
+  addToExclusions?: () => void;
   collections: {
     map: Map<string, number>;
     names: string[];
@@ -199,7 +201,28 @@ const MoveModal = ({
               )}
             </Pressable>
           </ScrollView>
-
+          {!!addToExclusions && (
+            <Pressable
+              onPress={addToExclusions}
+              className=" w-[100%] pt-[5px] pb-[5px] mt-[5px] mb-[10px] flex-row gap-2 items-center border-t-[0.5px] border-b-[0.5px] border-divider  "
+            >
+              <View className=" flex-1 flex-row gap-2 items-center ">
+                <View className=" p-[5px] border rounded-[50%] dark:border-white ">
+                  <ThemedIcon
+                    source={icons.add}
+                    className=" w-[10px] h-[10px] rotate-45 "
+                  />
+                </View>
+                <ThemedText className=" font-urbanistMedium text-[1.2rem] ">
+                  Add to Exclusions
+                </ThemedText>
+              </View>
+              <ThemedIcon
+                source={icons.chevron}
+                className=" w-[10px] h-[10px] rotate-[-90deg] "
+              />
+            </Pressable>
+          )}
           <View className={" flex-row justify-center pt-[5px] "}>
             <Pressable
               onPress={handleClose}

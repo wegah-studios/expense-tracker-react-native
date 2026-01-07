@@ -7,16 +7,6 @@ import { Modal, Platform, Pressable, View } from "react-native";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
-const options = [
-  { title: "labels", value: "label" },
-  { title: "Recipients", value: "recipient" },
-  { title: "Amounts", value: "amount" },
-  { title: "Reference IDs", value: "ref" },
-  { title: "Receipts", value: "receipt" },
-];
-
-const values = ["label", "recipient", "amount", "ref", "receipt", "date"];
-
 const ExpensesExportModal = ({
   open,
   enableRange,
@@ -32,6 +22,22 @@ const ExpensesExportModal = ({
     range?: { start: string; end: string }
   ) => void;
 }) => {
+  const options = useMemo(
+    () => [
+      { title: "labels", value: "label" },
+      { title: "Recipients", value: "recipient" },
+      { title: "Amounts", value: "amount" },
+      { title: "Reference IDs", value: "ref" },
+      { title: "Receipts", value: "receipt" },
+    ],
+    []
+  );
+
+  const values = useMemo(
+    () => ["label", "recipient", "amount", "ref", "receipt", "date"],
+    []
+  );
+
   const [images, setImages] = useState<boolean>(true);
   const [selection, setSelection] = useState<Set<string>>(new Set(values));
   const [range, setRange] = useState<{ start: Date; end: Date }>({
@@ -43,6 +49,7 @@ const ExpensesExportModal = ({
     open: boolean;
     type: "end" | "start";
   }>({ open: false, type: "end" });
+
   const allSelected = useMemo(
     () => selection.size === values.length,
     [selection, options]

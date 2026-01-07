@@ -1,9 +1,8 @@
-import { initDB } from "@/db/schema";
+import { initDB } from "@/db/db";
 import { addLog, toastError } from "@/lib/appUtils";
 import { updateExpiredBudgets } from "@/lib/budgetUtils";
-import { checkPinExists } from "@/lib/pinUtils";
-import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
 import { startSMSCapture } from "@/lib/smsUtils";
+import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
 import { Theme } from "@/types/common";
 import * as SplashScreen from "expo-splash-screen";
 import { colorScheme } from "nativewind";
@@ -20,7 +19,7 @@ import { isCaptureActive, stopCapture } from "react-native-sms-listener";
 const CustomThemeContext = createContext<{
   theme: Theme;
   toggleTheme: () => void;
-  fetchDBTheme: () => Promise<void>;
+  isRated: boolean;
   smsCaptureState: "on" | "off" | "dnd" | null;
   updateSmsCaptureState: (state: "on" | "off" | "dnd") => Promise<void>;
   pinProtected: boolean;
@@ -47,49 +46,47 @@ export const CustomThemeContextProvider = ({
   const [smsCaptureState, setSmsCaptureState] = useState<
     "on" | "off" | "dnd" | null
   >(null);
+  const [isRated, setIsRated] = useState<boolean>(false);
   const [pinProtected, setPinProtected] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
-
-  const fetchDBTheme = async () => {
-    try {
-      const preferences = await getPreferences("theme");
-      if (preferences.theme) {
-        colorScheme.set(preferences.theme as Theme);
-      }
-    } catch (error) {
-      toastError({}, `An error occured while updating theme`);
-    }
-  };
 
   useEffect(() => {
     try {
       const startup = async () => {
-        console.log("starting up")
         if (!mounted) {
+          console.log("starting up");
           //init db
           await initDB();
           //startup
-          const [preferences, isCapture, pinExists] = await Promise.all([
-            getPreferences("smsCapture"),
+          const [storage, isCapture] = await Promise.all([
+            getStoreItems("smsCapture", "rated", "theme", "hash"),
             isCaptureActive(),
-            checkPinExists(),
-            fetchDBTheme(),
-            updateExpiredBudgets(),
           ]);
 
-          if (
-            (!isCapture && preferences.smsCapture === "on") ||
-            (isCapture && preferences.smsCapture !== "on")
-          ) {
-            preferences.smsCapture = "off";
-            setPreferences({ smsCapture: "off" });
-            stopCapture();
+          await updateExpiredBudgets();
+
+          if (storage.theme) {
+            colorScheme.set(storage.theme as Theme);
           }
 
-          setSmsCaptureState((preferences.smsCapture || null) as any);
-          setPinProtected(pinExists);
+          setIsRated(!!storage.rated);
+          setPinProtected(!!storage.hash);
+
+          if (
+            (!isCapture && storage.smsCapture === "on") ||
+            (isCapture && storage.smsCapture !== "on")
+          ) {
+            storage.smsCapture = "off";
+            await Promise.all([
+              setStoreItems([["smsCapture", "off"]]),
+              stopCapture(),
+            ]);
+          }
+
+          setSmsCaptureState((storage.smsCapture || null) as any);
 
           addLog({ type: "info", content: "Startup successfull" });
+          console.log("started up complete.");
           setMounted(true);
         }
       };
@@ -102,8 +99,8 @@ export const CustomThemeContextProvider = ({
   const toggleTheme = () => {
     try {
       const newTheme = theme === "dark" ? "light" : "dark";
-      setPreferences({ theme: newTheme });
       colorScheme.set(newTheme);
+      setStoreItems([["theme", newTheme]]);
     } catch (error) {
       toastError({}, `An error occured while toggling theme`);
     }
@@ -130,7 +127,7 @@ export const CustomThemeContextProvider = ({
         { cause: 1 }
       );
     }
-    await setPreferences({ smsCapture: state });
+    await setStoreItems([["smsCapture", state]]);
     setSmsCaptureState(state);
   };
 
@@ -144,7 +141,7 @@ export const CustomThemeContextProvider = ({
         value={{
           theme,
           toggleTheme,
-          fetchDBTheme,
+          isRated,
           smsCaptureState,
           updateSmsCaptureState,
           pinProtected,

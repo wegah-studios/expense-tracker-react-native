@@ -122,12 +122,56 @@ const Notifications = () => {
 
   const handleDelete = async () => {
     try {
-      await deleteNofications(selected);
-      setNotifications((prev) => prev.filter((item) => !selected.has(item.id)));
-      resetSelected();
+      setStatus({
+        open: true,
+        type: "warning",
+        title: "Delete notifications?",
+        message: "Are you sure you want to delete the selected notifications?",
+        handleClose: handleStatusClose,
+        action: {
+          title: "Delete",
+          async callback() {
+            setStatus({
+              open: true,
+              type: "loading",
+              title: "Deleting",
+              message: "Deleting selected notifications",
+              handleClose: handleStatusClose,
+              action: {
+                callback: handleStatusClose,
+              },
+            });
+            await deleteNofications(selected);
+            setNotifications((prev) =>
+              prev.filter((item) => !selected.has(item.id))
+            );
+            setStatus({
+              open: true,
+              type: "success",
+              message: "Selected notifications deleted",
+              handleClose: handleStatusClose,
+              action: {
+                callback() {
+                  resetSelected();
+                  handleStatusClose();
+                },
+              },
+            });
+          },
+        },
+      });
     } catch (error) {
-      toastError(error, `An error occured while deleting notifications`);
-      resetSelected();
+      toastError(error);
+      setStatus({
+        open: true,
+        type: "error",
+        message:
+          "An error occured while deleting notifications, please try again.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
     }
   };
 

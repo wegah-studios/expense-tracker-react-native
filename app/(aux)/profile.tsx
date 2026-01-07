@@ -9,7 +9,7 @@ import { useCustomThemeContext } from "@/context/themeContext";
 import { factoryReset, toastError } from "@/lib/appUtils";
 import { exportData, importData } from "@/lib/exportUtils";
 import { removePin } from "@/lib/pinUtils";
-import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
+import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
 import { nativeApplicationVersion } from "expo-application";
 import { Link, router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
@@ -34,7 +34,6 @@ const Profile = () => {
   const {
     theme,
     toggleTheme,
-    fetchDBTheme,
     smsCaptureState,
     updateSmsCaptureState,
     pinProtected,
@@ -63,10 +62,10 @@ const Profile = () => {
   }>({ open: false, type: "pdf" });
 
   useEffect(() => {
-    const fetchPreferences = async () => {
+    const fetchStorage = async () => {
       try {
-        const preferences = await getPreferences("hideFab");
-        if (preferences["hideFab"] === "false") {
+        const storage = await getStoreItems("showFab");
+        if (storage["showFab"] === "false") {
           setShowFab(false);
         } else {
           setShowFab(true);
@@ -75,13 +74,13 @@ const Profile = () => {
         toastError(error, `An error occured while fetching preferences`);
       }
     };
-    fetchPreferences();
+    fetchStorage();
   }, []);
 
   const toggleFab = () => {
     setShowFab((prev) => {
       setTimeout(() => {
-        setPreferences({ hideFab: `${!prev}` });
+        setStoreItems([["showFab", `${!prev}`]]);
       }, 200);
       return !prev;
     });
@@ -194,7 +193,6 @@ const Profile = () => {
         },
       });
       await importData(uri, password);
-      await fetchDBTheme();
       setStatus({
         open: true,
         type: "success",
@@ -279,7 +277,6 @@ const Profile = () => {
               },
             });
             await factoryReset();
-            await fetchDBTheme();
             setStatus({
               open: true,
               type: "success",

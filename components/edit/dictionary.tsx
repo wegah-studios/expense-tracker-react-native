@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Dimensions, Pressable, ToastAndroid, View } from "react-native";
 import InputField from "../inputField";
 import LabelInput from "../labelInput";
+import RecipientInput from "../recipientInput";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
@@ -205,21 +206,29 @@ const EditDictionary = (props: Record<string, any>) => {
       >
         <View style={{ minHeight: Dimensions.get("window").height }}>
           <View className=" mb-[20px] flex-col gap-[10px] p-[20px] rounded-[20px] border border-divider ">
-            <InputField
-              name={"match"}
-              value={form.match}
-              label={matchType}
-              placeholder={
-                matchType === "keyword"
-                  ? "e.g 'mart'"
-                  : "e.g Quickmart Kilimani"
-              }
-              handleBlur={handleBlur}
-              handleChange={handleChange}
-              error={errors.match}
-              touched={touched.has("match")}
-              changed={changes.has("match")}
-            />
+            {matchType === "keyword" ? (
+              <InputField
+                name={"match"}
+                value={form.match}
+                label={matchType}
+                placeholder={"e.g 'mart'"}
+                handleBlur={handleBlur}
+                handleChange={handleChange}
+                error={errors.match}
+                touched={touched.has("match")}
+                changed={changes.has("match")}
+              />
+            ) : (
+              <RecipientInput
+                value={form.match}
+                placeHolder="e.g Quickmart Kilimani"
+                handleBlur={handleBlur}
+                handleChange={handleChange}
+                error={errors.match}
+                touched={touched.has("match")}
+                changed={changes.has("match")}
+              />
+            )}
             <LabelInput
               {...{
                 expenseValue: item.label,

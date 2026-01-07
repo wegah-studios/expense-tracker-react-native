@@ -3,11 +3,11 @@ import { normalizeString } from "@/lib/appUtils";
 import validateInput from "@/lib/validateInput";
 import React, { useState } from "react";
 import { Modal, Pressable, View } from "react-native";
-import InputField from "../inputField";
+import RecipientInput from "../recipientInput";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
-const AddCollectionModal = ({
+const AddExclusionModal = ({
   open,
   collections,
   handleClose,
@@ -16,14 +16,14 @@ const AddCollectionModal = ({
   open: boolean;
   collections: Map<string, number>;
   handleClose: () => void;
-  handleSubmit: (collection: string) => void;
+  handleSubmit: (exclusion: string) => void;
 }) => {
-  const [collection, setCollection] = useState<string>("");
+  const [recipient, setRecipient] = useState<string>("");
   const [error, setError] = useState<string>("must have at least 1 character");
   const [touched, setTouched] = useState<boolean>(false);
 
   const handleChange = (_: string, value: string) => {
-    setCollection(value);
+    setRecipient(value);
     const normalized = normalizeString(value);
     if (!touched) {
       setTouched(true);
@@ -39,9 +39,9 @@ const AddCollectionModal = ({
 
   const onSubmit = () => {
     if (!error) {
-      handleSubmit(normalizeString(collection));
+      handleSubmit(normalizeString(recipient));
       setTouched(false);
-      setCollection("");
+      setRecipient("");
       setError("must have at least 1 character");
       handleClose();
     }
@@ -60,11 +60,12 @@ const AddCollectionModal = ({
       >
         <Pressable
           onPress={() => {}}
+          style={{ height: "auto" }}
           className=" flex-col gap-[20px] w-[90vw] max-w-[600px] p-[20px] bg-white rounded-[20px] dark:bg-paper-dark "
         >
-          <View className=" flex-row justify-between pb-[5px]  ">
+          <View className=" flex-row justify-between  ">
             <ThemedText className=" font-urbanistMedium  text-[1.5rem]">
-              New Collection
+              New Exclusion
             </ThemedText>
             <Pressable onPress={handleClose}>
               <ThemedIcon
@@ -73,14 +74,12 @@ const AddCollectionModal = ({
               />
             </Pressable>
           </View>
-          <InputField
-            autoFocus
-            name="collection"
-            placeholder="Collection name"
-            value={collection}
-            showLabel={false}
+          <RecipientInput
+            value={recipient}
+            placeHolder="Expense recipient..."
             error={error}
             touched={touched}
+            changed={false}
             handleChange={handleChange}
             handleBlur={() => {}}
           />
@@ -105,4 +104,4 @@ const AddCollectionModal = ({
   );
 };
 
-export default AddCollectionModal;
+export default AddExclusionModal;

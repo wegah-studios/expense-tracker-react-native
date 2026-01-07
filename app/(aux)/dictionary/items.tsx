@@ -207,24 +207,55 @@ const DictionaryItems = () => {
       newArr[index] = update as DictionaryItem;
       return newArr;
     });
+    setStatus({
+      open: true,
+      type: "success",
+      message: "Dictionary successfully updated.",
+      handleClose: handleStatusClose,
+      action: {
+        callback: handleStatusClose,
+      },
+    });
   };
 
   const handleDelete = async () => {
     try {
       setStatus({
         open: true,
-        type: "loading",
-        title: "Deleting Items",
-        message: "Deleting selected items, please wait.",
+        type: "warning",
+        title: "Delete items?",
+        message: "Are you sure you want to delete the selected items?",
         handleClose: handleStatusClose,
         action: {
-          callback: handleStatusClose,
+          title: "Delete",
+          async callback() {
+            setStatus({
+              open: true,
+              type: "loading",
+              title: "Deleting",
+              message: "Deleting selected items",
+              handleClose: handleStatusClose,
+              action: {
+                callback: handleStatusClose,
+              },
+            });
+            await deleteDictionaryItems(selected, type);
+            setItems((prev) => prev.filter((item) => !selected.has(item.id)));
+            setStatus({
+              open: true,
+              type: "success",
+              message: "Selected items deleted",
+              handleClose: handleStatusClose,
+              action: {
+                callback() {
+                  resetSelected();
+                  handleStatusClose();
+                },
+              },
+            });
+          },
         },
       });
-      await deleteDictionaryItems(selected, type);
-      setItems((prev) => prev.filter((item) => !selected.has(item.id)));
-      resetSelected();
-      handleStatusClose();
     } catch (error) {
       toastError(error);
       setStatus({
@@ -247,7 +278,7 @@ const DictionaryItems = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
-      router.replace("/dictionary/items");
+      router.replace({ pathname: "/dictionary/items", params: { type } });
     }, 500);
   };
 

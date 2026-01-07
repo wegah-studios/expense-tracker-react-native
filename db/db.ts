@@ -1,9 +1,21 @@
-import { openDatabaseSync } from "expo-sqlite";
-
-const db = openDatabaseSync("app.db");
-export const DB_INTEGRITY = `d142b37bd786a9868e4c6eff5e173e3229d3b5591198ddb498345e59c2eb807d`;
+import { openDatabaseSync, SQLiteDatabase } from "expo-sqlite";
 
 const date = new Date();
+let last: Promise<any> = Promise.resolve();
+
+let db: SQLiteDatabase | null = null;
+
+if (!db) {
+  db = openDatabaseSync("app.db");
+}
+
+export const DB_INTEGRITY = `d142b37bd786a9868e4c6eff5e173e3229d3b5591198ddb498345e59c2eb807d`;
+
+export function enqueueDB<T>(task: () => Promise<T>): Promise<T> {
+  const run = last.then(task, task);
+  last = run.catch(() => {});
+  return run;
+}
 
 export const schema = `
       PRAGMA journal_mode = WAL;
@@ -16,6 +28,7 @@ export const schema = `
       amount REAL,
       currency TEXT,
       date TEXT,
+      searchable_date TEXT,
       receipt TEXT,
       image TEXT,
       modifiedAt TEXT
@@ -31,6 +44,7 @@ export const schema = `
       INSERT OR IGNORE INTO collections (name, count) VALUES ('trash', 0);
       INSERT OR IGNORE INTO collections (name, count) VALUES ('keywords', 7);
       INSERT OR IGNORE INTO collections (name, count) VALUES ('recipients', 0);
+      INSERT OR IGNORE INTO collections (name, count) VALUES ('exclusions', 0);
       INSERT OR IGNORE INTO collections (name, count) VALUES ('my collection', 0);
 
       CREATE TABLE IF NOT EXISTS statistics (
@@ -68,11 +82,6 @@ export const schema = `
         repeat INTEGER
       );
 
-      CREATE TABLE IF NOT EXISTS preferences (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-
       CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
       type TEXT,
@@ -86,10 +95,15 @@ export const schema = `
       INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("1", "info", "/dictionary/main", "Automatically label expenses", "View your dictionary and assign labels to expenses.", "${date.toISOString()}", 1);
       INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("2", "info", "/profile", "Secure your expenses", "Setup a pin to restrict access to your expenses.", "${date.toISOString()}", 1);
       INSERT OR IGNORE INTO notifications (id, type, path, title, message, date, unread) VALUES ("3", "info", "/expenses/collections", "Editing expenses", "You can edit multiple expenses in one go by long pressing then selecting as many expenses as you need and press edit at the top bar. Only the values entered will be changed.", "${date.toISOString()}", 1);
+
+      CREATE TABLE IF NOT EXISTS store (
+      key TEXT PRIMARY KEY,
+      value TEXT
+      );
       `;
 
 export const initDB = async () => {
   await db.execAsync(schema);
 };
 
-export default db;
+export default db as SQLiteDatabase

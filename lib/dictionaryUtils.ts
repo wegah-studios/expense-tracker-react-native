@@ -1,10 +1,17 @@
-import db from "@/db/schema";
+import db, { enqueueDB } from "@/db/db";
 import { DictionaryItem, DictionaryItemType } from "@/types/common";
 import { nanoid } from "nanoid/non-secure";
+import {
+  addDictionaryItemQuery,
+  deleteDictionaryItemsQuery,
+  insertIntoDictionaryFromExpenseQuery,
+  updateDictionaryFromExpenseQuery,
+  updateDictionaryItemQuery,
+} from "./queries";
 
 export const getSuggestions = async () => {
-  const results: { label: string }[] = await db.getAllAsync(
-    `SELECT label FROM dictionary ORDER BY label `
+  const results: { label: string }[] = await enqueueDB(() =>
+    db.getAllAsync(`SELECT label FROM dictionary ORDER BY label `)
   );
   const record = new Set();
   const suggestions: string[] = results.reduce((arr, { label }) => {
@@ -65,58 +72,55 @@ export const updateDictionaryItem = async (
   item: Partial<DictionaryItem>,
   mode: "add" | "update"
 ) => {
+  let query = "";
   item.id = item.id || nanoid();
   item.modifiedAt = new Date().toISOString();
-  item.type = item.type || "keyword";
 
   const keys = Object.keys(item);
-  const values = Object.values(item);
   if (mode === "add") {
-    const result = await db.runAsync(
-      `INSERT OR REPLACE INTO dictionary (${keys.join(
-        ", "
-      )}) VALUES (?${`, ?`.repeat(keys.length - 1)})`,
-      values
+    const data: { id: string } | null = await db.getFirstAsync(
+      `SELECT id FROM dictionary WHERE match = ? AND type = ?;`,
+      item.match || null,
+      item.type || null
     );
-    if (result.changes === 1) {
-      await db.runAsync(
-        `UPDATE collections SET count = count + 1 WHERE name = ? `,
-        item.type + "s"
-      );
-    }
+    const exists = data?.id;
+    query += addDictionaryItemQuery(keys, item, exists);
   } else {
-    values.push(item.id);
-    await db.runAsync(
-      `UPDATE dictionary SET ${keys.map((key) => `${key} = ?`)} WHERE id = ?`,
-      values
-    );
+    query += updateDictionaryItemQuery(keys, item);
   }
+
+  await db.execAsync(query);
   return item;
 };
 
-export const handleExpenseUpdate = async (label: string, recipient: string) => {
+export const handleDictionaryUpdates = (
+  recipients: string[],
+  labels: Record<string, string>,
+  exists: Record<string, string>
+) => {
+  
   const modifiedAt = new Date().toISOString();
-  const result = await db.runAsync(
-    `INSERT OR REPLACE INTO dictionary (type, label, match, modifiedAt) VALUES (?, ?, ?, ?)`,
-    "recipient",
-    label,
-    recipient,
-    modifiedAt
-  );
-  if (result.changes === 1) {
-    await Promise.all([
-      db.runAsync(
-        `UPDATE collections SET count = count + 1 WHERE name = ? `,
-        "recipients"
-      ),
-      db.runAsync(
-        `UPDATE dictionary SET id = ? WHERE match = ? AND type = ? `,
-        nanoid(),
-        recipient,
-        "recipient"
-      ),
-    ]);
+  let query = "";
+  for (let recipient of recipients) {
+    let id = exists[recipient];
+    const label = labels[recipient];
+    if (id) {
+      query += updateDictionaryFromExpenseQuery({
+        id,
+        label,
+        modifiedAt,
+      });
+    } else {
+      id = nanoid()
+      query += insertIntoDictionaryFromExpenseQuery({
+        id,
+        label,
+        modifiedAt,
+        match: recipient,
+      });
+    }
   }
+  return query;
 };
 
 export const deleteDictionaryItems = async (
@@ -124,14 +128,6 @@ export const deleteDictionaryItems = async (
   type: DictionaryItemType
 ) => {
   const ids = [...selected];
-  await Promise.all([
-    db.runAsync(
-      `DELETE FROM dictionary WHERE id IN (?${`, ?`.repeat(ids.length - 1)}) `,
-      ids
-    ),
-    db.runAsync(
-      `UPDATE collections SET count = count - ${ids.length} WHERE name = ? `,
-      type + "s"
-    ),
-  ]);
+  let query = deleteDictionaryItemsQuery(ids, type);
+  await db.execAsync(query);
 };

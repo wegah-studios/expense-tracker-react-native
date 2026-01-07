@@ -12,9 +12,7 @@
       "distribution": "internal"
     },
     "production": {
-      "android": {
-        "versionCode": 12
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

@@ -1,19 +1,25 @@
-import db from "@/db/schema";
+import db, { enqueueDB } from "@/db/db";
 import { Expense } from "@/types/common";
-import * as Filesystem from "expo-file-system/legacy";
+import dayjs from "dayjs";
 import { nanoid } from "nanoid/non-secure";
 import { deleteReceipt } from "react-native-sms-listener";
 import * as XLSX from "xlsx";
-import { normalizeString } from "./appUtils";
-import { updateBudgets } from "./budgetUtils";
-import { addToCollection, removeFromCollection } from "./collectionsUtils";
-import { handleExpenseUpdate } from "./dictionaryUtils";
+import { formatQueryValue, normalizeString } from "./appUtils";
+import { handleDictionaryUpdates } from "./dictionaryUtils";
 import { deleteImage, saveImage } from "./imageUtils";
+import {
+  addToCollectionQuery,
+  deleteExpenseQuery,
+  handleExpenseQuery,
+  removeFromCollectionQuery,
+  updateBudgetsQuery,
+} from "./queries";
 import { updateStatistics } from "./statisticsUtils";
 
 export const getExpenses = async ({
   search,
   collection,
+  exclusion,
   limit,
   page = 1,
   ids,
@@ -24,6 +30,7 @@ export const getExpenses = async ({
   collection?: string;
   limit?: number;
   page?: number;
+  exclusion?: string;
   ids?: string[];
   range?: {
     start: string;
@@ -34,7 +41,6 @@ export const getExpenses = async ({
     direction: "ASC" | "DESC";
   };
 }) => {
-  collection = collection || "expenses";
   let query: string = " SELECT * FROM expenses ";
   let params: (string | number)[] = [];
 
@@ -43,26 +49,15 @@ export const getExpenses = async ({
     params = ids;
   }
 
-  if (collection) {
-    if (collection !== "expenses") {
-      query += ` ${ids?.length ? "AND" : "WHERE"} collection = ? `;
-      params.push(collection);
-    } else {
-      query += ` ${
-        ids?.length ? "AND" : "WHERE"
-      } collection != ? AND collection != ? `;
-      params.push("failed", "trash");
-    }
-  }
-
   if (search) {
-    query += ` ${ids?.length || collection ? "AND" : "WHERE"} 
+    query += ` ${ids?.length ? "AND" : "WHERE"} 
     (label LIKE ?
     OR recipient LIKE ?
     OR ref LIKE ?
     OR collection LIKE ?
     OR CAST(amount AS TEXT) LIKE ?
     OR date LIKE ?
+    OR searchable_date LIKE ?
     OR receipt LIKE ?
     ) 
     `;
@@ -73,12 +68,34 @@ export const getExpenses = async ({
       `%${search}%`,
       `%${search}%`,
       `%${search}%`,
+      `%${search}%`,
       `%${search}%`
     );
   }
 
+  if (collection) {
+    if (collection !== "expenses") {
+      query += ` ${ids?.length || search ? "AND" : "WHERE"} collection = ? `;
+      params.push(collection);
+    } else {
+      query += ` ${
+        ids?.length || search ? "AND" : "WHERE"
+      } collection != ? AND collection != ? AND collection != ? `;
+      params.push("failed", "trash", "exclusions");
+    }
+  }
+
+  if (exclusion) {
+    query += ` ${ids?.length || collection || search ? "AND" : "WHERE"}
+    collection = ? AND recipient = ?
+    `;
+    params.push("exclusions", exclusion);
+  }
+
   if (range) {
-    query += ` ${ids?.length || collection || search ? "AND" : "WHERE"} 
+    query += ` ${
+      ids?.length || collection || search || exclusion ? "AND" : "WHERE"
+    } 
     date >= ? AND date <= ?
      `;
     params.push(range.start, range.end);
@@ -92,8 +109,31 @@ export const getExpenses = async ({
     params.push(limit, offset);
   }
 
-  const expenses: Partial<Expense>[] = await db.getAllAsync(query, params);
+  const expenses: Partial<Expense>[] = await enqueueDB(() =>
+    db.getAllAsync(query, params)
+  );
   return expenses;
+};
+
+export const getRecipients = async (search?: string) => {
+  let results: string[] = [];
+  if (search) {
+    let record: Record<string, boolean> = {};
+    const data: { recipient: string }[] = await enqueueDB(() =>
+      db.getAllAsync(
+        `SELECT recipient FROM expenses WHERE recipient LIKE ? ORDER BY recipient DESC LIMIT ? OFFSET ? ;`,
+        [`%${search}%`, 6, 0]
+      )
+    );
+    results = data.reduce((arr, { recipient }) => {
+      if (!record[recipient]) {
+        arr.push(recipient);
+        record[recipient] = true;
+      }
+      return arr;
+    }, [] as string[]);
+  }
+  return results;
 };
 
 export const deleteExpenses = async (
@@ -102,40 +142,37 @@ export const deleteExpenses = async (
   collections: {
     map: Map<string, number>;
     names: string[];
-  }
+    exclusions: string[];
+}
 ) => {
-  await db.withTransactionAsync(async () => {
-    let promises: Promise<any>[] = [];
-    collections.map = new Map(collections.map);
-    expenses = expenses.filter((expense, index) => {
-      if (selected.has(index)) {
-        promises.push(updateExpense(expense, "delete"));
+  let filtered: Partial<Expense>[] = [];
+  let removed: Partial<Expense>[] = [];
+  collections.map = new Map(collections.map);
+  for (let i = 0; i < expenses.length; i++) {
+    const expense = expenses[i];
+    if (selected.has(i)) {
+      removed.push(expense);
 
-        if (expense.collection) {
-          if (
-            expense.collection !== "failed" &&
-            expense.collection !== "trash"
-          ) {
-            let count = collections.map.get("trash");
-            collections.map.set("trash", (count || 0) + 1);
-          }
-          let count = collections.map.get(expense.collection);
-          collections.map.set(expense.collection, (count || 1) - 1);
-          if (expense.collection !== "expenses") {
-            count = collections.map.get("expenses");
-            collections.map.set("expenses", (count || 1) - 1);
-          }
+      if (expense.collection) {
+        if (expense.collection !== "failed" && expense.collection !== "trash") {
+          let count = collections.map.get("trash");
+          collections.map.set("trash", (count || 0) + 1);
         }
-        return false;
-      } else {
-        return true;
+        let count = collections.map.get(expense.collection);
+        collections.map.set(expense.collection, (count || 1) - 1);
+        if (expense.collection !== "expenses") {
+          count = collections.map.get("expenses");
+          collections.map.set("expenses", (count || 1) - 1);
+        }
       }
-    });
+    } else {
+      filtered.push(expense);
+    }
+  }
 
-    await Promise.all(promises);
-  });
+  await updateExpenses(removed, "delete");
 
-  return { expenses, collections };
+  return { expenses: filtered, collections };
 };
 
 export const restoreExpenses = async (
@@ -143,30 +180,23 @@ export const restoreExpenses = async (
   collections: {
     map: Map<string, number>;
     names: string[];
-  },
+    exclusions: string[];
+},
   expenses: Partial<Expense>[]
 ) => {
-  collections.map = new Map(collections.map);
+  let filtered: Partial<Expense>[] = [];
+  let restored: Partial<Expense>[] = [];
 
-  let promises: Promise<any>[] = [];
-
-  expenses = expenses.filter((expense, index) => {
-    let collection = expense.collection;
-    if (selected.has(index)) {
-      if (collection) {
-        promises.push(removeFromCollection(collection));
-        expense.collection = "expenses";
-        promises.push(
-          updateExpense({
-            ...expense,
-            image: `${Filesystem.documentDirectory}images/${expense.image}`,
-          })
-        );
-      }
+  for (let i = 0; i < expenses.length; i++) {
+    const expense = expenses[i];
+    if (selected.has(i)) {
+      restored.push(expense);
     } else {
-      return true;
+      filtered.push(expense);
     }
-  });
+  }
+
+  collections.map = new Map(collections.map);
   collections.map.set(
     "trash",
     (collections.map.get("trash") || selected.size) - selected.size
@@ -175,9 +205,9 @@ export const restoreExpenses = async (
     "expenses",
     (collections.map.get("expenses") || 0) + selected.size
   );
-  await Promise.all(promises);
 
-  return { expenses, collections };
+  await updateExpenses(restored, "restore");
+  return { expenses: filtered, collections };
 };
 
 export const groupExpenseSections = (
@@ -206,30 +236,35 @@ export const groupExpenseSections = (
 
 export const onExpenseUpdate = (
   expenses: Partial<Expense>[],
-  collections: { names: string[]; map: Map<string, number> },
+  collections: {
+    map: Map<string, number>;
+    names: string[];
+    exclusions: string[];
+  },
   update: Map<number, Partial<Expense>>,
   collection: string
 ) => {
   let newExpenses: Partial<Expense>[] = [];
-  const newCollections = {
-    names: [...collections.names],
-    map: new Map(collections.map),
-  };
-  expenses.forEach((expense, index) => {
-    const edit = update.get(index);
+  collections.map = new Map(collections.map)
+  collections.names = [...collections.names]
+
+  for (let i = 0; i < expenses.length; i++) {
+    const expense = expenses[i];
+    const edit = update.get(i);
+
     if (edit) {
       if (
         edit.collection &&
         expense.collection &&
         edit.collection !== expense.collection
       ) {
-        if (!newCollections.map.has(edit.collection)) {
-          newCollections.names.push(edit.collection);
+        if (!collections.map.has(edit.collection)) {
+          collections.names.push(edit.collection);
         }
-        const expenseCount = newCollections.map.get(expense.collection) || 1;
-        const editCount = newCollections.map.get(edit.collection) || 0;
-        newCollections.map.set(expense.collection, expenseCount - 1);
-        newCollections.map.set(edit.collection, editCount + 1);
+        const expenseCount = collections.map.get(expense.collection) || 1;
+        const editCount = collections.map.get(edit.collection) || 0;
+        collections.map.set(expense.collection, expenseCount - 1);
+        collections.map.set(edit.collection, editCount + 1);
 
         if (collection === "expenses") {
           newExpenses.push(edit);
@@ -240,214 +275,234 @@ export const onExpenseUpdate = (
     } else {
       newExpenses.push(expense);
     }
-  });
+  }
 
-  return { newExpenses, newCollections };
+  return { expenses: newExpenses, collections };
 };
 
-export const updateExpense = async (
-  expense: Partial<Expense>,
-  mode: "add" | "delete" | "update" = "add",
-  previousExpense?: Partial<Expense>,
+export const updateExpenses = async (
+  expenses: Partial<Expense>[],
+  mode: "add" | "delete" | "update" | "restore" = "add",
+  previousExpenses?: Map<number, Partial<Expense>>,
   updateDictionary?: boolean
 ) => {
-  let query: string = ``;
-  let params: (string | number)[] = [];
-  const promises: Promise<any>[] = [];
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    let query = "";
+    let promises: Promise<any>[] = [];
+    let updates: { dictionary: Record<string, string> } = {
+      dictionary: {},
+    };
 
-  let isTrash = expense.collection === "trash";
-  let isFailed = expense.collection === "failed";
+    for (let i = 0; i < expenses.length; i++) {
+      let expense = expenses[i];
+      const previousExpense = previousExpenses?.get(i);
 
-  expense.modifiedAt = new Date().toISOString();
+      let isTrash = expense.collection === "trash";
+      let isFailed = expense.collection === "failed";
+      if (expense.id) {
+        if (mode === "delete") {
+          if (isTrash || isFailed) {
+            query += deleteExpenseQuery({ id: expense.id });
+            if (expense.image) {
+              promises.push(deleteImage(expense.image));
+            }
+          } else {
+            query += deleteExpenseQuery(
+              { id: expense.id, modifiedAt: expense.modifiedAt },
+              true
+            );
+            query += addToCollectionQuery("trash");
+          }
 
-  if (mode === "delete" && expense.id) {
-    if (isTrash || isFailed) {
-      query = "DELETE FROM expenses";
-    } else {
-      query = `UPDATE expenses SET collection = ?, modifiedAt = ?`;
-      params.push("trash", expense.modifiedAt);
+          if (expense.collection) {
+            query += removeFromCollectionQuery(expense.collection);
+            if (expense.collection !== "expenses" && !isTrash && !isFailed) {
+              query += removeFromCollectionQuery("expenses");
+            }
+          }
+        } else {
+          expense.id = expense.id || nanoid();
 
-      if (expense.image && (isTrash || isFailed)) {
-        promises.push(deleteImage(expense.image));
+          if (expense.image && mode !== "restore") {
+            const fileName = expense.image.split("/").pop();
+            if (fileName) {
+              promises.push(saveImage(expense.image, fileName));
+              expense.image = fileName;
+            }
+
+            if (previousExpense && previousExpense.image) {
+              promises.push(deleteImage(previousExpense.image));
+            }
+          }
+
+          if (
+            expense.label &&
+            updateDictionary &&
+            (expense.recipient || previousExpense?.recipient)
+          ) {
+            updates.dictionary[
+              expense.recipient || previousExpense?.recipient || ""
+            ] = expense.label;
+          }
+
+          if (expense.date && mode !== "restore") {
+            expense.searchable_date = dayjs(new Date(expense.date)).format(
+              "dddd DD MMMM YYYY"
+            );
+          }
+
+          if (mode === "restore" && isTrash) {
+            query += removeFromCollectionQuery("trash");
+            expense.collection = "expenses";
+            isTrash = false;
+          }
+
+          const keys = Object.keys(expense);
+
+          if (mode === "add" || mode === "restore") {
+            if (mode === "add") {
+              query += handleExpenseQuery(keys, expense, "add");
+            } else {
+              if (expense.collection) {
+                query += handleExpenseQuery(keys, expense, "restore");
+              }
+            }
+
+            if (expense.collection) {
+              if (
+                expense.collection !== "failed" &&
+                expense.collection !== "exclusions"
+              ) {
+                query += addToCollectionQuery("expenses");
+              }
+              if (expense.collection !== "expenses") {
+                query += addToCollectionQuery(expense.collection);
+              }
+              if (expense.collection === "exclusions" && expense.recipient) {
+                query += addToCollectionQuery("exclusion/" + expense.recipient);
+              }
+            }
+          }
+          if (mode === "update") {
+            query += handleExpenseQuery(keys, expense, "update");
+
+            if (
+              expense.collection &&
+              previousExpense &&
+              previousExpense.collection
+            ) {
+              if (previousExpense.collection !== "expenses") {
+                query += removeFromCollectionQuery(previousExpense.collection);
+              }
+              query += addToCollectionQuery(expense.collection);
+            }
+          }
+        }
+
+        if (!isTrash && !isFailed && expense.collection !== "exclusions") {
+          const statisticsUpdate =
+            previousExpense &&
+            ((expense.amount && previousExpense.amount) ||
+              (expense.label && previousExpense.label) ||
+              (expense.date && previousExpense.date));
+
+          if (mode === "delete" || (mode === "update" && statisticsUpdate)) {
+            query += updateStatistics(previousExpense || expense, "delete");
+            query += updateBudgetsQuery(previousExpense || expense, "delete");
+          }
+
+          if (
+            mode === "add" ||
+            mode === "restore" ||
+            (mode === "update" && statisticsUpdate)
+          ) {
+            query += updateStatistics({ ...previousExpense, ...expense });
+            query += updateBudgetsQuery(
+              { ...previousExpense, ...expense },
+              "add"
+            );
+          }
+        }
       }
-
-      promises.push(addToCollection("trash"));
     }
-    query += ` WHERE id = ?`;
-    params.push(expense.id);
+    const dictionaryKeys = Object.keys(updates.dictionary);
+    if (dictionaryKeys.length) {
+      const data: { id: string; match: string }[] = await tx.getAllAsync(
+        `SELECT id, match FROM dictionary WHERE type = ? AND  match IN (?${", ?".repeat(
+          dictionaryKeys.length - 1
+        )});`,
+        ["recipient", ...dictionaryKeys]
+      );
 
-    if (expense.collection) {
-      promises.push(removeFromCollection(expense.collection));
-      if (expense.collection !== "expenses" && !isTrash && !isFailed) {
-        promises.push(removeFromCollection("expenses"));
-      }
-    }
-  } else {
-    expense.id = expense.id || nanoid();
-    expense.currency = expense.currency || "Ksh";
+      const exists = data.reduce((obj, { id, match }) => {
+        obj[match] = id;
+        return obj;
+      }, {} as Record<string, string>);
 
-    if (expense.image) {
-      const fileName = expense.image.split("/").pop() || "";
-      promises.push(saveImage(expense.image, fileName));
-      expense.image = fileName;
-
-      if (previousExpense && previousExpense.image) {
-        promises.push(deleteImage(previousExpense.image));
-      }
-    }
-
-    if (
-      expense.label &&
-      updateDictionary &&
-      (expense.recipient || previousExpense?.recipient)
-    ) {
-      promises.push(
-        handleExpenseUpdate(
-          expense.label,
-          expense.recipient || previousExpense?.recipient || ""
-        )
+      query += handleDictionaryUpdates(
+        dictionaryKeys,
+        updates.dictionary,
+        exists
       );
     }
 
-    const keys = Object.keys(expense);
-    const values = Object.values(expense);
-
-    if (mode === "add") {
-      query = `INSERT INTO expenses (${keys.join(
-        ", "
-      )}) VALUES ( ?${", ?".repeat(keys.length - 1)})`;
-      params = values;
-
-      if (expense.collection) {
-        if (expense.collection !== "failed") {
-          promises.push(addToCollection("expenses"));
-        }
-        if (expense.collection !== "expenses") {
-          promises.push(addToCollection(expense.collection));
-        }
-      }
-    }
-    if (mode === "update") {
-      query = `UPDATE expenses SET ${keys.map(
-        (key) => ` ${key} = ?`
-      )} WHERE id = ?`;
-      params = [...values, expense.id];
-
-      if (expense.collection && previousExpense && previousExpense.collection) {
-        if (previousExpense.collection !== "expenses") {
-          promises.push(removeFromCollection(previousExpense.collection));
-        }
-        promises.push(addToCollection(expense.collection));
-      }
-    }
-  }
-
-  promises.push(db.runAsync(query, params));
-
-  if (!isTrash && !isFailed) {
-    const statisticsUpdate =
-      previousExpense &&
-      ((expense.amount && previousExpense.amount) ||
-        (expense.label && previousExpense.label) ||
-        (expense.date && previousExpense.date));
-
-    if (mode === "delete" || (mode === "update" && statisticsUpdate)) {
-      updateStatistics(previousExpense || expense, promises, "delete");
-      promises.push(updateBudgets(previousExpense || expense, "delete"));
-    }
-
-    if (mode === "add" || (mode === "update" && statisticsUpdate)) {
-      updateStatistics({ ...previousExpense, ...expense }, promises);
-      promises.push(updateBudgets({ ...previousExpense, ...expense }, "add"));
-    }
-  }
-  await Promise.all(promises);
-  return expense;
+    await tx.execAsync(query);
+    await Promise.all(promises);
+  });
 };
 
-export const updateMultipleExpenses = async (
+export const editMultipleExpenses = async (
   edit: Partial<Expense>,
   expenses: Partial<Expense>[],
   indices: number[]
 ) => {
   let map: Map<number, Partial<Expense>> = new Map();
-  await db.withTransactionAsync(async () => {
-    let promises: Promise<any>[] = [];
-    for (let index of indices) {
-      const update = { ...edit };
-      const expense = expenses[index];
-      update.id = expense.id;
-      if (expense.collection === "failed") {
-        update.collection = update.collection || "expenses";
-      }
-      promises.push(updateExpense(update, "update", expense, true));
-      map.set(index, { ...expense, ...update });
+  let updates: Partial<Expense>[] = [];
+  let previousExpenses: Map<number, Partial<Expense>> = new Map();
+  for (let i = 0; i < expenses.length; i++) {
+    let update = { ...edit };
+    const expense = expenses[i];
+    update.id = expense.id;
+    if (expense.collection === "failed") {
+      update.collection = update.collection || "expenses";
+      update = { ...expense, ...update };
     }
-    await Promise.all(promises);
-  });
+    updates.push(update);
+    previousExpenses.set(i, expense);
+    map.set(indices[i], { ...expense, ...update });
+  }
+  await updateExpenses(updates, "update", previousExpenses, true);
   return map;
 };
 
 export const parseMessages = async (str: string) => {
-  const report: { complete: number; incomplete: number } = {
-    complete: 0,
-    incomplete: 0,
-  };
-  const messages: string[] = await new Promise((resolve, reject) => {
-    const data = str.split(/confirmed/i);
-    resolve(data);
-  });
+  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let recipients: string[] = [];
+  let expenses: Partial<Expense>[] = [];
 
-  await db.withTransactionAsync(async () => {
-    const promises = [];
-    for (let i = 0; i < messages.length; i++) {
-      let ref = messages[i].slice(-11).trim();
+  const messages: string[] = str.split(/confirmed/i);
 
-      if (/^(?=.*\d)[A-Z\d]{10}$/.test(ref)) {
-        let message: string =
-          ref + " confirmed " + messages[i + 1].slice(0, -11);
-        promises.push(handleMessage(message, report));
-      }
+  for (let i = 0; i < messages.length; i++) {
+    let ref = messages[i].slice(-11).trim();
+
+    if (/^(?=.*\d)[A-Z\d]{10}$/.test(ref)) {
+      let message: string = ref + " confirmed " + messages[i + 1].slice(0, -11);
+      handleMessage(message, recipients, expenses);
     }
-    await Promise.all(promises);
-  });
+  }
+  await handleExpensesImport(recipients, expenses, report);
   return report;
 };
 
-export const handleMessage = async (
+const handleMessage = (
   message: string,
-  report: { complete: number; incomplete: number }
+  recipients: string[],
+  expenses: Partial<Expense>[]
 ) => {
   if (!/(sent to|paid to|you bought|withdraw)/i.test(message)) {
     return;
   }
 
-  let data: Partial<Expense> = await new Promise((resolve, reject) => {
-    const result = parseMessage(message);
-    resolve(result);
-  });
-
-  let label = await fetchExpenseLabel(data.recipient);
-
-  data = {
-    ...data,
-    id: nanoid(),
-    receipt: message,
-    label,
-    currency: "Ksh",
-  };
-
-  if (data.amount === undefined || !data.date || !data.recipient) {
-    data.collection = "failed";
-    report.incomplete += 1;
-  } else {
-    data.collection = "expenses";
-    report.complete += 1;
-  }
-  await updateExpense(data);
-};
-
-const parseMessage = (message: string) => {
   const ref = message.trim().substring(0, 11);
   message = ref + " " + normalizeString(message.slice(10));
   const recipientMatch = message.match(/to (.+?) on|from (.+?) new/i);
@@ -504,47 +559,33 @@ const parseMessage = (message: string) => {
     }
   }
 
-  return {
+  let expense: Partial<Expense> = {
     ref,
     amount,
     recipient,
     date: dateTime,
+    receipt: message,
   };
+  getImportInfo(expense, recipients);
+  expenses.push(expense);
 };
 
-export const fetchExpenseLabel = async (recipient?: string) => {
-  let label: string = "";
-  if (!recipient) {
+const getExpenseLabel = (
+  recipient: string,
+  dictionary: Record<string, string>
+) => {
+  let label = dictionary[recipient];
+  if (label) {
     return label;
   }
 
-  const dictionaryResult: { label: string } | null = await db.getFirstAsync(
-    "SELECT label FROM dictionary WHERE match = ? ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
-    recipient
-  );
+  label = recipient.split(" ").slice(0, 2).join(" ");
 
-  if (dictionaryResult) {
-    label = dictionaryResult.label;
-  } else {
-    const keywordResult: { label: string } | null = await db.getFirstAsync(
-      "SELECT label FROM dictionary WHERE ? LIKE '%' || match || '%' ORDER BY modifiedAt DESC LIMIT 1 OFFSET 0 ",
-      recipient
-    );
-
-    if (keywordResult) {
-      label = keywordResult.label;
-    }
-  }
-
-  if (!label) {
-    label = recipient.split(" ").slice(0, 2).join(" ");
-
-    let accountIndex = recipient.indexOf("for account");
-    if (accountIndex !== -1) {
-      accountIndex += 12;
-      let account = recipient.substring(accountIndex).split(" ")[0]
-      label += "," + account;
-    }
+  let accountIndex = recipient.indexOf("for account");
+  if (accountIndex !== -1) {
+    accountIndex += 12;
+    let account = recipient.substring(accountIndex).split(" ")[0];
+    label += "," + account;
   }
 
   return label;
@@ -552,57 +593,107 @@ export const fetchExpenseLabel = async (recipient?: string) => {
 
 export const parsePdfText = async (text: string) => {
   const receipts = text.match(
-    /\b(?=[A-Z0-9]{10}\b)(?=.*[A-Z])(?=.*\d)[A-Z0-9]{10}\b(\s|\n|\s\n)\b\d{4}-\d{2}-\d{2}(\s|\n|\s\n)\d{2}:\d{2}:\d{2}\b([\s\S]*?)COMPLETED(\s|\n|\s\n)(.+?)(\s|\n|\s\n)(.+?)(\s|\n|\s\n)(.+?)(\s|\n|\s\n)/g
+    /\b(?=[A-Z0-9]{10}\b)(?=.*[A-Z])(?=.*\d)[A-Z0-9]{10}\b(\s+|\n+|\s+\n+|\n+\s+)\b\d{4}-\d{2}-\d{2}(\s+|\n+|\s+\n+|\n+\s+)\d{2}:\d{2}:\d{2}\b([\s\S]*?)completed(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)/gi
   );
 
   let expenses: Partial<Expense>[] = [];
-  let incomplete = 0;
-  let complete = 0;
   let record: Record<string, { index: number; isTransactionCost: boolean }> =
     {};
 
+  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let recipients: string[] = [];
+
   if (!receipts || !receipts.length) {
-    return { incomplete, complete };
+    return report;
   }
 
   for (let receipt of receipts) {
-    handlePdfReceipt(receipt, expenses, record);
+    handlePdfReceipt(receipt, expenses, recipients, record);
   }
+  await handleExpensesImport(recipients, expenses, report);
 
-  await db.withTransactionAsync(async () => {
-    let promises = [];
-    for (let expense of expenses) {
-      promises.push(
-        new Promise<void>(async (resolve) => {
-          expense.id = nanoid();
-          expense.currency = "Ksh";
-          expense.label = await fetchExpenseLabel(expense.recipient);
-
-          if (
-            expense.amount === undefined ||
-            !expense.date ||
-            !expense.recipient
-          ) {
-            expense.collection = "failed";
-            incomplete += 1;
-          } else {
-            expense.collection = "expenses";
-            complete += 1;
-          }
-          await updateExpense(expense);
-          resolve();
-        })
-      );
-    }
-    await Promise.all(promises);
-  });
-
-  return { incomplete, complete };
+  return report;
 };
 
-export const handlePdfReceipt = (
+const getImportInfo = (expense: Partial<Expense>, recipients: string[]) => {
+  expense.id = nanoid();
+  expense.currency = "Ksh";
+  if (expense.recipient) {
+    recipients.push(expense.recipient);
+  }
+  if (!expense.date || !expense.recipient || !expense.amount) {
+    expense.collection = "failed";
+  } else {
+    expense.collection = "expenses";
+  }
+};
+
+const getDictionary = async (recipients: string[]) => {
+  let query = "SELECT label, match FROM dictionary WHERE";
+
+  for (let i = 0; i < recipients.length; i++) {
+    const recipient = recipients[i];
+    query += ` ${i === 0 ? "" : "OR"} ${formatQueryValue(
+      recipient
+    )} LIKE '%' || match || '%'`;
+  }
+
+  const data: { match: string; label: string }[] = await db.getAllAsync(query);
+  return data.reduce((obj, { match, label }) => {
+    for (let recipient of recipients) {
+      if (recipient.includes(match)) {
+        obj[recipient] = label;
+      }
+    }
+
+    return obj;
+  }, {} as Record<string, string>);
+};
+
+const handleExpensesImport = async (
+  recipients: string[],
+  expenses: Partial<Expense>[],
+  report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+  }
+) => {
+  const data: { name: string }[] = await db.getAllAsync(
+    `SELECT name FROM collections WHERE name IN (${recipients
+      .map((recipient) => formatQueryValue("exclusion/" + recipient))
+      .join(", ")});`
+  );
+  const exclusions = data.reduce((obj, { name }) => {
+    obj[name.replace("exclusion/", "")] = true;
+    return obj;
+  }, {} as Record<string, boolean>);
+  const dictionary = await getDictionary(recipients);
+
+  for (let expense of expenses) {
+    if (expense.collection === "failed") {
+      report.incomplete += 1;
+    } else {
+      if (expense.recipient) {
+        if (exclusions[expense.recipient]) {
+          report.excluded += 1;
+          expense.collection = "exclusions";
+        } else {
+          report.complete += 1;
+        }
+      }
+    }
+    if (expense.recipient) {
+      expense.label = getExpenseLabel(expense.recipient, dictionary);
+    }
+  }
+  await updateExpenses(expenses);
+};
+
+const handlePdfReceipt = (
   receipt: string,
   expenses: Partial<Expense>[],
+  recipients: string[],
   record: Record<
     string,
     {
@@ -611,8 +702,11 @@ export const handlePdfReceipt = (
     }
   >
 ) => {
-  const [_a, _b, withdrawn] = receipt.match(/COMPLETED (.+?) (.+?) /) || [];
-  const amount = Number(withdrawn.replace(/,/g, ""));
+  const [_a, _b, _c, _d, withdrawn] =
+    receipt.match(
+      /completed(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)/i
+    ) || [];
+  const amount = Number(withdrawn?.replace(/,/g, ""));
 
   if (!amount) {
     return;
@@ -621,13 +715,17 @@ export const handlePdfReceipt = (
   const ref = receipt.substring(0, 10);
   const date = new Date(
     receipt
-      .match(/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b/)?.[0]
+      .match(
+        /\b\d{4}-\d{2}-\d{2}(\s+|\n+|\s+\n+|\n+\s+)\d{2}:\d{2}:\d{2}\b/
+      )?.[0]
       ?.replace(" ", "T") || ""
   ).toISOString();
 
   const details =
     receipt
-      .match(/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b([\s\S]*?)COMPLETED/)?.[1]
+      .match(
+        /\b\d{4}-\d{2}-\d{2}(\s+|\n+|\s+\n+|\n+\s+)\d{2}:\d{2}:\d{2}\b([\s\S]*?)completed/i
+      )?.[2]
       ?.replace(/\s+/g, " ")
       .trim()
       .toLowerCase() || "";
@@ -642,7 +740,10 @@ export const handlePdfReceipt = (
       .pop()
       ?.trim() || "";
 
-  const isTransactionCost = / Charge([\s\S]*?)COMPLETED/.test(receipt);
+  const isTransactionCost =
+    /(\s+|\n+|\s+\n+|\n+\s+)charge(\s+|\n+|\s+\n+|\n+\s+)completed/i.test(
+      receipt
+    );
 
   if (record[ref]) {
     const expense = expenses[record[ref].index];
@@ -662,17 +763,25 @@ export const handlePdfReceipt = (
     record[ref].isTransactionCost = isTransactionCost;
   } else {
     record[ref] = { index: expenses.length, isTransactionCost };
-    expenses.push({ ref, date, amount, recipient, receipt: details });
+    const expense: Partial<Expense> = {
+      ref,
+      date,
+      amount,
+      recipient,
+      receipt: details,
+    };
+    getImportInfo(expense, recipients);
+    expenses.push(expense);
   }
 };
 
 export const parseExcelFile = async (b64: string) => {
-  let complete = 0;
-  let incomplete = 0;
+  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let recipients: string[] = [];
   let expenses: Partial<Expense>[] = [];
+
   await db.withTransactionAsync(async () => {
     const wb = XLSX.read(b64, { type: "base64" });
-    let promises = [];
 
     for (let name of wb.SheetNames) {
       const ws = wb.Sheets[name];
@@ -702,51 +811,35 @@ export const parseExcelFile = async (b64: string) => {
         }
 
         if (Object.keys(expense).length) {
-          if (
-            !expense.label ||
-            !expense.date ||
-            !expense.recipient ||
-            !expense.amount
-          ) {
-            expense.collection = "failed";
-            incomplete += 1;
-          } else {
-            expense.collection = "expenses";
-            complete += 1;
-          }
-          expense.id = nanoid();
-          expense.currency = "Ksh";
-          promises.push(updateExpense(expense));
+          getImportInfo(expense, recipients);
+          expenses.push(expense);
         }
       }
     }
-
-    await Promise.all(promises);
   });
-  return { complete, incomplete };
+  await handleExpensesImport(recipients, expenses, report);
+  return report;
 };
 
 export const importFromSMSListener = async (messages: string[]) => {
-  const report: { complete: number; incomplete: number } = {
-    complete: 0,
-    incomplete: 0,
-  };
-  await db.withTransactionAsync(async () => {
-    const promises: Promise<any>[] = [];
-    for (let message of messages) {
-      promises.push(handleMessage(message, report));
-    }
-    await Promise.all(promises);
-  });
+  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let recipients: string[] = [];
+  let expenses: Partial<Expense>[] = [];
+
+  for (let message of messages) {
+    handleMessage(message, recipients, expenses);
+  }
+  await handleExpensesImport(recipients, expenses, report);
   return report;
 };
 
 export const handleSmsEvent = async (message: { id: number; body: string }) => {
-  const report: { complete: number; incomplete: number } = {
-    complete: 0,
-    incomplete: 0,
-  };
-  await handleMessage(message.body, report);
+  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let recipients: string[] = [];
+  let expenses: Partial<Expense>[] = [];
+
+  handleMessage(message.body, recipients, expenses);
+  await handleExpensesImport(recipients, expenses, report);
   await deleteReceipt(message.id);
   return report;
 };

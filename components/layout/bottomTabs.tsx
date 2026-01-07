@@ -1,6 +1,6 @@
 import { useEditingContext } from "@/context/editingContext";
 import { toastError } from "@/lib/appUtils";
-import { getPreferences } from "@/lib/preferenceUtils";
+import { getStoreItems } from "@/lib/storeUtils";
 import { Href, router, useSegments } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
@@ -23,10 +23,10 @@ const BottomTabs = () => {
   const [showFab, setShowFab] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchPreferences = async () => {
+    const fetchStorage = async () => {
       try {
-        const preferences = await getPreferences("hideFab");
-        if (preferences["hideFab"] === "false") {
+        const storage = await getStoreItems("showFab");
+        if (storage["showFab"] === "false") {
           setShowFab(false);
         } else {
           setShowFab(true);
@@ -35,7 +35,7 @@ const BottomTabs = () => {
         toastError(error, `An error occured while fetching preferences`);
       }
     };
-    fetchPreferences();
+    fetchStorage();
   }, []);
 
   const handleTabPress = (

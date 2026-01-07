@@ -8,7 +8,8 @@ const ExpensesLayout = () => {
   const [collections, setCollections] = useState<{
     map: Map<string, number>;
     names: string[];
-  }>({ map: new Map(), names: [] });
+    exclusions: string[];
+  }>({ map: new Map(), names: [], exclusions: [] });
 
   useEffect(() => {
     const fetchCollections = async () => {

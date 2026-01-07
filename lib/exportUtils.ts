@@ -1,4 +1,4 @@
-import db, { DB_INTEGRITY } from "@/db/schema";
+import db, { DB_INTEGRITY } from "@/db/db";
 import { Expense, ManifestEntry } from "@/types/common";
 import CryptoJS from "crypto-js";
 import dayjs from "dayjs";
@@ -22,7 +22,6 @@ const tables = [
   "expenses",
   "dictionary",
   "budgets",
-  "preferences",
   "notifications",
   "collections",
   "statistics",
@@ -131,10 +130,6 @@ export const importData = async (uri: string, password: string) => {
     const dataFile = `${unzipDir}/data.xlsx`;
     const imagesDir = `${unzipDir}/images`;
 
-    if (await dirExists(dataFile)) {
-      promises.push(importDb(dataFile));
-    }
-
     if (await dirExists(imagesDir)) {
       const images = await FileSystem.readDirectoryAsync(imagesDir);
 
@@ -150,7 +145,11 @@ export const importData = async (uri: string, password: string) => {
 
     await Promise.all(promises);
 
-    await Promise.all([FileSystem.deleteAsync(unzipDir, { idempotent: true })]);
+    if (await dirExists(dataFile)) {
+      await importDb(dataFile);
+    }
+
+    await FileSystem.deleteAsync(unzipDir, { idempotent: true });
   } catch (error: any) {
     if ((error.message as string).includes("Wrong password")) {
       throw new Error(`Wrong password`, { cause: 1 });
@@ -168,30 +167,20 @@ export const importDb = async (dataFile: string) => {
   const wb = XLSX.read(b64, { type: "base64" });
 
   await db.withExclusiveTransactionAsync(async (tx) => {
-    const txPromises = [];
     for (let name of wb.SheetNames) {
       const ws = wb.Sheets[name];
       const data: Record<string, any>[] = XLSX.utils.sheet_to_json(ws);
       let query = data.reduce((str, item) => {
         const keys = Object.keys(item);
         const values = Object.values(item);
-        str += `
-            INSERT INTO ${name} (${keys.join(", ")}) VALUES (${values
+        str += `\nINSERT INTO ${name} (${keys.join(", ")}) VALUES (${values
           .map((value) => (typeof value === "string" ? `"${value}"` : value))
-          .join(", ")});
-            `;
+          .join(", ")});`;
         return str;
       }, ``);
 
-      txPromises.push(
-        tx.execAsync(`
-            DELETE FROM ${name};
-            ${query}
-          `)
-      );
+      await tx.execAsync(`DELETE FROM ${name}; \n${query}`);
     }
-
-    await Promise.all(txPromises);
   });
 };
 
@@ -219,11 +208,11 @@ export const exportData = async (password: string) => {
     }
   }
 
-  const data_file = `${export_dir}/data.xlsx`;
-  promises.push(exportDb(data_file));
-  allFiles.push(data_file);
-
   await Promise.all(promises);
+
+  const data_file = `${export_dir}/data.xlsx`;
+  await exportDb(data_file);
+  allFiles.push(data_file);
 
   const manifest = await generateManifest(allFiles, export_dir);
   const manifestJson = JSON.stringify(manifest);
@@ -248,29 +237,20 @@ export const exportData = async (password: string) => {
     "public.zip-archive"
   );
 
-  await FileSystem.deleteAsync(export_dir);
+  await FileSystem.deleteAsync(export_dir, { idempotent: true });
 };
 
 export const exportDb = async (export_file: string) => {
   const wb = XLSX.utils.book_new();
 
   await db.withExclusiveTransactionAsync(async (tx) => {
-    let promises = [];
-
     for (let table of tables) {
-      promises.push(
-        new Promise<void>(async (resolve) => {
-          const data: Record<string, any>[] = await tx.getAllAsync(
-            `SELECT * FROM ${table}`
-          );
-          const ws = XLSX.utils.json_to_sheet(data);
-          XLSX.utils.book_append_sheet(wb, ws, table);
-          resolve();
-        })
+      const data: Record<string, any>[] = await tx.getAllAsync(
+        `SELECT * FROM ${table}`
       );
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, table);
     }
-
-    await Promise.all(promises);
   });
 
   const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
@@ -320,10 +300,9 @@ export const exportExpenses = async (
 
   const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
   await ensureDirExists(EXPORTS_PATH);
-  const fileName = `export_${new Date()
-    .toISOString()
-    .split(".")
-    .join(":")}.xlsx`;
+  const fileName = `expenses_${dayjs(new Date()).format(
+    "YYYY_MMM_DD_HH_mm_ss"
+  )}.xlsx`;
   const excelUri = `${EXPORTS_PATH}/${fileName}`;
 
   await FileSystem.writeAsStringAsync(excelUri, wbout, {

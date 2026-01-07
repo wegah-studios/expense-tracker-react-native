@@ -36,9 +36,10 @@ import * as Progress from "react-native-progress";
 
 const Collection = () => {
   const { theme } = useCustomThemeContext();
-  const { collection, filter } = useLocalSearchParams() as {
+  const { collection, filter, exclusion } = useLocalSearchParams() as {
     collection?: string;
     filter?: string;
+    exclusion?: string;
   };
 
   const { collections, setCollections } = useAppProps() as {
@@ -46,6 +47,7 @@ const Collection = () => {
     collections: {
       map: Map<string, number>;
       names: string[];
+      exclusions: string[];
     };
     setCollections: React.Dispatch<
       React.SetStateAction<{
@@ -66,10 +68,6 @@ const Collection = () => {
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [canGoNext, setCanGoNext] = useState<boolean>(false);
 
-  const expenseCollection = useMemo(
-    () => collection || "expenses",
-    [collection]
-  );
   const sections = useMemo<{ id: string; data: number[] }[]>(() => {
     const data = groupExpenseSections(expenses);
     setExpenseIndicies(data.indices);
@@ -106,13 +104,14 @@ const Collection = () => {
 
   useEffect(() => {
     fetchExpenses({
-      collection: expenseCollection,
+      collection: collection,
+      exclusion,
       sort: filter ? { property: filter, direction: "DESC" } : undefined,
     });
     if (filter) {
       setSort({ property: filter, direction: "DESC" });
     }
-  }, [expenseCollection, filter]);
+  }, [collection, filter, exclusion]);
 
   useEffect(() => {
     if (selectAll) {
@@ -126,17 +125,20 @@ const Collection = () => {
   const fetchExpenses = async (query: {
     search?: string;
     collection?: string;
+    exclusion?: string;
     page?: number;
     sort?: { property: string; direction: "ASC" | "DESC" };
   }) => {
     try {
       setLoading(true);
+
       const data = await getExpenses({
         search,
-        collection: expenseCollection,
+        collection,
         limit: 10,
         page: 1,
         sort,
+        exclusion,
         ...query,
       });
       setPage(1);
@@ -188,8 +190,9 @@ const Collection = () => {
       setLoading(true);
       const newPage = await getExpenses({
         search,
-        collection: expenseCollection,
+        collection,
         sort,
+        exclusion,
         page: page + 1,
         limit: 10,
       });
@@ -304,22 +307,23 @@ const Collection = () => {
           expenses: [expenses[index]],
           mode: "edit",
           indices: [index],
+          readonly: collection === "trash" || !!exclusion,
           handleUpdate: handleItemUpdate,
         });
       }
     },
-    [expenses]
+    [expenses, exclusion, collection]
   );
 
   const handleItemUpdate = (update: Map<number, Partial<Expense>>) => {
-    const { newExpenses, newCollections } = onExpenseUpdate(
+    const results = onExpenseUpdate(
       expenses,
       collections,
       update,
-      expenseCollection
+      collection || "expenses"
     );
-    setExpenses(newExpenses);
-    setCollections(newCollections);
+    setExpenses(results.expenses);
+    setCollections(results.collections);
     setStatus({
       open: true,
       type: "success",
@@ -392,7 +396,7 @@ const Collection = () => {
           callback() {},
         },
       });
-      const data = await getExpenses({ range });
+      const data = await getExpenses({ range, collection: "expenses" });
 
       if (!data.length) {
         handleStatusClose();
@@ -411,7 +415,7 @@ const Collection = () => {
     setTimeout(() => {
       router.replace({
         pathname: "/expenses/collection",
-        params: { collection, filter },
+        params: { collection, filter, exclusion },
       });
     }, 500);
   };
@@ -439,7 +443,13 @@ const Collection = () => {
                 className="flex-1"
               >
                 <ThemedText className=" font-urbanistBold text-[2rem] capitalize">
-                  {selectMode ? `${selected.size} Selected` : expenseCollection}
+                  {selectMode
+                    ? `${selected.size} Selected`
+                    : collection
+                    ? collection
+                    : exclusion
+                    ? "Excluded expenses"
+                    : "expenses"}
                 </ThemedText>
               </ScrollView>
             </View>
@@ -490,7 +500,8 @@ const Collection = () => {
           {selectMode ? (
             <SelectActions
               {...{
-                collection: expenseCollection as string,
+                collection: collection || "expenses",
+                exclusion,
                 expenses,
                 setExpenses,
                 selected,

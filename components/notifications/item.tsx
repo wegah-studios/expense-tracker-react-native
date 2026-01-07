@@ -28,20 +28,6 @@ const NotificationItem = React.memo(
       handleLongPress(notification.id, index);
     };
 
-    // const handlePress = () => {
-    //   if (selectMode) {
-    //     handleItemSelect(notification.id, picked ? "delete" : "add");
-    //   } else {
-    //     router.push(notification.path as Href);
-    //   }
-    // };
-
-    // const handleLongPress = () => {
-    //   if (!picked) {
-    //     handleItemSelect(notification.id, "add");
-    //   }
-    // };
-
     return (
       <Pressable
         onPress={onPress}

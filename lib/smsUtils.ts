@@ -4,10 +4,9 @@ import {
   startCapture,
   stopCapture,
 } from "react-native-sms-listener";
-import { setPreferences } from "./preferenceUtils";
+import { addLog } from "./appUtils";
 
 export const startSMSCapture = async () => {
-  console.log("start sms capture");
   const permitted = await requestSmsPermissions();
   if (!permitted) {
     throw new Error(
@@ -16,12 +15,12 @@ export const startSMSCapture = async () => {
     );
   }
   await startCapture("MPESA", "(?i)(sent to|paid to|you bought|withdraw)");
-  await setPreferences({ smsCapture: "on" });
+  addLog({type:"info", date:new Date().toISOString(), content:"SMS capture started"})
 };
 
 export const stopSMSCapture = async () => {
   await stopCapture();
-  await setPreferences({ smsCapture: "off" });
+  addLog({type:"info", date:new Date().toISOString(), content:"SMS capture stopped"})
 };
 
 export const hasSmsPermission = async () => {

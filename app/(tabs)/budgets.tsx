@@ -59,6 +59,15 @@ const Budgets = () => {
 
   const onAdd = (update: Budget) => {
     setBudgets((prev) => [update, ...prev]);
+    setStatus({
+      open: true,
+      type: "success",
+      message: "New budget added.",
+      handleClose: handleStatusClose,
+      action: {
+        callback: handleStatusClose,
+      },
+    });
   };
 
   useEffect(() => {
@@ -178,6 +187,15 @@ const Budgets = () => {
       newArr[index] = update;
       return newArr;
     });
+    setStatus({
+      open: true,
+      type: "success",
+      message: "Budget successfully updated.",
+      handleClose: handleStatusClose,
+      action: {
+        callback: handleStatusClose,
+      },
+    });
   };
 
   const handleItemPress = (id: string, index: number) => {
@@ -229,26 +247,40 @@ const Budgets = () => {
     try {
       setStatus({
         open: true,
-        type: "loading",
-        title: "Deleting",
-        message: "Deleting selected budgets",
+        type: "warning",
+        title: "Delete budgets?",
+        message: "Are you sure you want to delete the selected budgets?",
         handleClose: handleStatusClose,
         action: {
-          callback: handleStatusClose,
-        },
-      });
-      deleteBudgets(selected);
-      setBudgets((prev) =>
-        prev ? prev.filter((budget) => !selected.has(budget.id)) : prev
-      );
-      resetSelected();
-      setStatus({
-        open: true,
-        type: "success",
-        message: "Selected budgets deleted",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
+          title: "Delete",
+          async callback() {
+            setStatus({
+              open: true,
+              type: "loading",
+              title: "Deleting",
+              message: "Deleting selected budgets",
+              handleClose: handleStatusClose,
+              action: {
+                callback: handleStatusClose,
+              },
+            });
+            await deleteBudgets(selected);
+            setBudgets((prev) =>
+              prev ? prev.filter((budget) => !selected.has(budget.id)) : prev
+            );
+            setStatus({
+              open: true,
+              type: "success",
+              message: "Selected budgets deleted",
+              handleClose: handleStatusClose,
+              action: {
+                callback() {
+                  resetSelected();
+                  handleStatusClose();
+                },
+              },
+            });
+          },
         },
       });
     } catch (error) {

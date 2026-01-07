@@ -8,7 +8,7 @@ import { useEditingContext } from "@/context/editingContext";
 import { useAppProps } from "@/context/propContext";
 import { toastError } from "@/lib/appUtils";
 import { createCollection, deleteCollections } from "@/lib/collectionsUtils";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Image,
@@ -109,27 +109,48 @@ const Collections = () => {
     }
   };
 
+  const resetSelected = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
   const handleDelete = async () => {
     try {
       setStatus({
         open: true,
-        type: "loading",
-        title: "Deleting collections",
-        message: "please wait",
+        type: "warning",
+        title: "Delete collections?",
+        message: "Are you sure you want to delete the selected collections?",
         handleClose: handleStatusClose,
-        action: { callback() {} },
-      });
-      const result = await deleteCollections(selected, collections);
-      setCollections(result);
-      setSelectMode(false);
-      setSelected(new Set());
-      setStatus({
-        open: true,
-        type: "success",
-        title: "Collections deleted",
-        message: "The selected collections have been deleted",
-        handleClose: handleStatusClose,
-        action: { callback: handleStatusClose },
+        action: {
+          title: "Delete",
+          async callback() {
+            setStatus({
+              open: true,
+              type: "loading",
+              title: "Deleting",
+              message: "Deleting selected collections",
+              handleClose: handleStatusClose,
+              action: {
+                callback: handleStatusClose,
+              },
+            });
+            const result = await deleteCollections(selected, collections);
+            setCollections(result);
+            setStatus({
+              open: true,
+              type: "success",
+              message: "Selected collections deleted",
+              handleClose: handleStatusClose,
+              action: {
+                callback() {
+                  resetSelected();
+                  handleStatusClose();
+                },
+              },
+            });
+          },
+        },
       });
     } catch (error) {
       toastError(error);
@@ -318,6 +339,30 @@ const Collections = () => {
                   className=" w-[20px] h-[20px]  rotate-[-90deg] "
                 />
               </Pressable>
+              <Link asChild href={"/expenses/exclusions"}>
+                <Pressable className=" p-[20px] flex-row items-center rounded-[20px] gap-5 bg-paper-light dark:bg-paper-dark ">
+                  <View className=" p-[10px] border-[2px] rounded-[50%] dark:border-white ">
+                    <ThemedIcon
+                      source={icons.add}
+                      className=" w-[20px] h-[20px] rotate-45 "
+                    />
+                  </View>
+                  <View className=" flex-col flex-1 ">
+                    <ThemedText className=" font-urbanistMedium text-[1.3rem] ">
+                      Exclusions
+                    </ThemedText>
+                    <ThemedText>{`${
+                      collections.map.get("exclusions") || 0
+                    } item${
+                      collections.map.get("exclusions") === 1 ? "" : "s"
+                    }`}</ThemedText>
+                  </View>
+                  <ThemedIcon
+                    source={icons.chevron}
+                    className=" w-[20px] h-[20px]  rotate-[-90deg] "
+                  />
+                </Pressable>
+              </Link>
             </View>
           )}
         </ScrollView>

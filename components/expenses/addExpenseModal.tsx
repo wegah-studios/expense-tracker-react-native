@@ -61,16 +61,17 @@ const AddExpenseModal = ({
     openEditSheet({
       type: "messages",
       snapPoints: ["80%", "100%"],
-      handleUpdate: handleMessagesSubmit,
+      handleUpdate: handleReport,
     });
     handleClose();
   };
 
-  const handleMessagesSubmit = (report: {
+  const handleReport = (report: {
     complete: number;
     incomplete: number;
+    excluded: number;
   }) => {
-    if (!report.complete && !report.incomplete) {
+    if (!report.complete && !report.incomplete && !report.excluded) {
       setStatus({
         open: true,
         type: "info",
@@ -89,6 +90,10 @@ const AddExpenseModal = ({
       message: `New expenses imported:${
         report.complete
           ? `\n\n^icon|success^ ${report.complete} successfully added.`
+          : ""
+      }${
+        report.excluded
+          ? `\n\n^icon|info^ ${report.excluded} excluded expenses.`
           : ""
       }${
         report.incomplete
@@ -143,54 +148,17 @@ const AddExpenseModal = ({
           callback() {},
         },
       });
-      let report: { complete: number; incomplete: number } = {
+      let report = {
         complete: 0,
         incomplete: 0,
+        excluded: 0,
       };
       if (fileModal.type === "excel") {
         report = await importExpenses(uri);
       } else if (fileModal.type === "pdf") {
         report = await importStatement(uri);
       }
-      if (!report.complete && !report.incomplete) {
-        setStatus({
-          open: true,
-          type: "info",
-          title: "No expenses found.",
-          message: "No expenses have been imported, please try again.",
-          handleClose: handleStatusClose,
-          action: {
-            callback: handleStatusClose,
-          },
-        });
-      }
-      setStatus({
-        open: true,
-        type: "info",
-        title: "Expenses imported",
-        message: `New expenses imported:${
-          report.complete
-            ? `\n\n^icon|success^ ${report.complete} successfully added.`
-            : ""
-        }${
-          report.incomplete
-            ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
-            : ""
-        }`,
-        handleClose: handleStatusClose,
-        action: {
-          title: "View",
-          callback() {
-            const path: Href = "/expenses/collections";
-            if (pathname !== "/expenses/collections") {
-              router.push(path);
-            } else {
-              router.replace(path);
-            }
-            handleStatusClose();
-          },
-        },
-      });
+      handleReport(report);
     } catch (error) {
       toastError(error);
       setStatus({

@@ -7,7 +7,7 @@ import icons from "@/constants/icons";
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { copyToClipboard, pasteFromClipboard } from "@/lib/clipboardUtils";
 import { getCollections } from "@/lib/collectionsUtils";
-import { updateExpense, updateMultipleExpenses } from "@/lib/expenseUtils";
+import { editMultipleExpenses, updateExpenses } from "@/lib/expenseUtils";
 import { dowloadImage } from "@/lib/imageUtils";
 import validateInput from "@/lib/validateInput";
 import {
@@ -27,6 +27,7 @@ import { Image, Platform, Pressable, ToastAndroid, View } from "react-native";
 import MoveModal from "../expenses/moveModal";
 import ViewImageModal from "../expenses/viewImageModal";
 import LabelInput from "../labelInput";
+import RecipientInput from "../recipientInput";
 
 const EditExpense = (props: Record<string, any>) => {
   const scrollViewRef = useRef<any>(null);
@@ -34,6 +35,7 @@ const EditExpense = (props: Record<string, any>) => {
   const {
     indices,
     mode,
+    readonly,
     expenses,
     handleUpdate,
     close,
@@ -41,6 +43,7 @@ const EditExpense = (props: Record<string, any>) => {
     handleStatusClose,
   } = props as {
     mode: "add" | "edit" | "multiple";
+    readonly?: boolean;
     indices?: number[];
     expenses: Partial<Expense>[];
     handleUpdate?: (update: Map<number, Partial<Expense>>) => void;
@@ -48,7 +51,6 @@ const EditExpense = (props: Record<string, any>) => {
     handleStatusClose: () => void;
     close: () => void;
   };
-
   const [form, setForm] = useState<ExpenseForm>({ label: [] });
   const [labelInput, setLabelInput] = useState<string>("");
   const [errors, setErrors] = useState<ExpenseFormErrors>({
@@ -89,7 +91,8 @@ const EditExpense = (props: Record<string, any>) => {
     () =>
       !form.collection ||
       form.collection === "expenses" ||
-      form.collection === "failed",
+      form.collection === "failed" ||
+      form.collection === "exclusions",
     [form.collection]
   );
 
@@ -221,8 +224,8 @@ const EditExpense = (props: Record<string, any>) => {
       setStatus({
         open: true,
         type: "loading",
-        title: mode === "edit" ? "Updating" : "Adding",
-        message: `${mode === "edit" ? "updating" : "adding"} expense`,
+        title: mode === "add" ?  "Adding" : "Updating",
+        message: `${mode === "add" ? "adding" : "Updating"} expense${mode === "multiple" ? "s" :""}, please wait`,
         handleClose: handleStatusClose,
         action: {
           callback() {},
@@ -269,10 +272,10 @@ const EditExpense = (props: Record<string, any>) => {
             const edits = edit;
             edit = { ...expense, ...edits };
           }
-          await updateExpense(
-            edit,
+          await updateExpenses(
+            [edit],
             mode === "add" ? "add" : "update",
-            mode === "edit" ? expense : undefined,
+            mode === "edit" ? new Map([[0, expense]]) : undefined,
             true
           );
           edit = { ...expense, ...edit };
@@ -281,7 +284,7 @@ const EditExpense = (props: Record<string, any>) => {
           }
         } else {
           if (indices) {
-            update = await updateMultipleExpenses(edit, expenses, indices);
+            update = await editMultipleExpenses(edit, expenses, indices);
           }
         }
         handleStatusClose();
@@ -293,7 +296,7 @@ const EditExpense = (props: Record<string, any>) => {
         setStatus({
           open: true,
           type: "error",
-          message: "An error occured while updating expense, please try again.",
+          message: "An error occured while updating expenses, please try again.",
           handleClose: handleStatusClose,
           action: {
             callback() {
@@ -377,7 +380,7 @@ const EditExpense = (props: Record<string, any>) => {
   const handleImagePress = () => {
     if (form.image) {
       setViewImageModal(form.image);
-    } else {
+    } else if (!readonly) {
       setSelectImageModal(true);
     }
   };
@@ -416,10 +419,12 @@ const EditExpense = (props: Record<string, any>) => {
 
   return (
     <>
-      <View className=" pl-[10px] pr-[10px] pt-[20px] pb-[20px] flex-row items-center justify-between bg-paper-light dark:bg-paper-dark ">
+      <View className=" relative pl-[10px] pr-[10px] pt-[20px] pb-[20px] flex-row items-center justify-between bg-paper-light dark:bg-paper-dark ">
         <View className=" flex-row items-center gap-2 ">
           <ThemedText className=" font-urbanistBold text-[1.8rem] capitalize ">
-            {(mode || "Add") + " Expense" + (mode === "multiple" ? "s" : "")}
+            {(readonly ? "View" : mode || "Add") +
+              " Expense" +
+              (mode === "multiple" ? "s" : "")}
           </ThemedText>
         </View>
         <Pressable
@@ -438,6 +443,16 @@ const EditExpense = (props: Record<string, any>) => {
             />
           )}
         </Pressable>
+        {!!readonly && (
+          <View
+            style={{ zIndex: 1 }}
+            className=" absolute bottom-[-120%] left-[50%] transform -translate-x-1/2 p-[10px] rounded-[10px] bg-info "
+          >
+            <ThemedText toggleOnDark={false} reverse>
+              View Only Mode
+            </ThemedText>
+          </View>
+        )}
       </View>
       <BottomSheetScrollView
         ref={scrollViewRef}
@@ -457,6 +472,7 @@ const EditExpense = (props: Record<string, any>) => {
           )}
           <LabelInput
             {...{
+              disabled: readonly,
               expenseValue: expense.label,
               value: form.label,
               input: labelInput,
@@ -473,6 +489,7 @@ const EditExpense = (props: Record<string, any>) => {
             }}
           />
           <Pressable
+            disabled={!!readonly}
             onPress={() => setCollectionModal(true)}
             className={`  flex-row items-center gap-[10px] p-[10px] rounded-[10px] border ${
               changes.has("collection")
@@ -497,19 +514,21 @@ const EditExpense = (props: Record<string, any>) => {
             </ThemedText>
           </Pressable>
           <View className="  flex-col gap-[10px] p-[20px] rounded-[20px] border border-divider ">
-            <InputField
-              name="recipient"
-              placeholder="e.g Mr John"
-              required
-              value={form.recipient}
-              handleChange={handleChange}
-              handleBlur={handleBlur}
-              onFocus={() => handleInputFocus(50)}
-              error={errors.recipient}
-              touched={touched.has("recipient")}
-              changed={changes.has("recipient")}
+            <RecipientInput
+              {...{
+                disabled: readonly,
+                value: form.recipient || "",
+                placeHolder: "e.g Mr John",
+                changed: changes.has("recipient"),
+                touched: changes.has("recipient"),
+                error: errors.recipient,
+                handleBlur,
+                handleChange,
+                handleFocus: () => handleInputFocus(50),
+              }}
             />
             <InputField
+              editable={!readonly}
               name="amount"
               placeholder="e.g Ksh 500"
               required
@@ -523,12 +542,14 @@ const EditExpense = (props: Record<string, any>) => {
               keyboardType="numeric"
             />
           </View>
+
           <View className="  flex-col gap-[10px] p-[20px] rounded-[20px] border border-divider ">
             <View className=" flex-col gap-[10px] ">
               <ThemedText className=" font-urbanistMedium text-[1.2rem] ">
                 Date
               </ThemedText>
               <Pressable
+                disabled={!!readonly}
                 onPress={() => openDatePicker("date")}
                 className={` p-[10px] rounded-[10px] border ${
                   changes.has("date")
@@ -551,6 +572,7 @@ const EditExpense = (props: Record<string, any>) => {
                 Time
               </ThemedText>
               <Pressable
+                disabled={!!readonly}
                 onPress={() => openDatePicker("time")}
                 className={` p-[10px] rounded-[10px] border ${
                   changes.has("date")
@@ -573,6 +595,7 @@ const EditExpense = (props: Record<string, any>) => {
           </View>
           <View className="  flex-col gap-[10px] p-[20px] rounded-[20px] border border-divider ">
             <InputField
+              editable={!readonly}
               name="ref"
               label="Reference ID"
               placeholder="e.g HMDLX123"
@@ -604,6 +627,7 @@ const EditExpense = (props: Record<string, any>) => {
                 )}
               </View>
               <InputField
+                editable={!readonly}
                 name="receipt"
                 value={form.receipt}
                 showLabel={false}
@@ -621,6 +645,7 @@ const EditExpense = (props: Record<string, any>) => {
               />
               {!form.receipt && (
                 <Pressable
+                  disabled={!!readonly}
                   onPress={handleReceiptPaste}
                   className=" absolute top-[38] right-[10]  p-[10px] pt-[3px] pb-[3px] bg-black rounded-[20px] dark:bg-white "
                 >
@@ -666,16 +691,20 @@ const EditExpense = (props: Record<string, any>) => {
           </Pressable>
           {!!form.image && (
             <View className=" mt-[20px] pb-[20px] flex-row gap-[10px] ">
-              <Pressable
-                onPress={() => setSelectImageModal(true)}
-                className=" flex-1 items-center justify-center p-[20px] pt-[10px] pb-[10px] flex-row gap-2 rounded-[20px] border border-black dark:border-white "
-              >
-                <ThemedIcon
-                  source={icons.image}
-                  className=" w-[15px] h-[15px] "
-                />
-                <ThemedText>Change</ThemedText>
-              </Pressable>
+              {!!readonly ? (
+                <View></View>
+              ) : (
+                <Pressable
+                  onPress={() => setSelectImageModal(true)}
+                  className=" flex-1 items-center justify-center p-[20px] pt-[10px] pb-[10px] flex-row gap-2 rounded-[20px] border border-black dark:border-white "
+                >
+                  <ThemedIcon
+                    source={icons.image}
+                    className=" w-[15px] h-[15px] "
+                  />
+                  <ThemedText>Change</ThemedText>
+                </Pressable>
+              )}
               <Pressable
                 onPress={handleDownload}
                 className=" flex-1 items-center justify-center p-[20px] pt-[10px] pb-[10px] flex-row gap-2 bg-black rounded-[20px] dark:bg-white "

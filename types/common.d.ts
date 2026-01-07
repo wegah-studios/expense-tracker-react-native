@@ -1,3 +1,5 @@
+import { TextProps } from "react-native";
+
 export type Theme = "light" | "dark";
 
 export type Expense = {
@@ -9,6 +11,7 @@ export type Expense = {
   amount: number;
   currency: string;
   date: string;
+  searchable_date: string;
   receipt: string;
   image: string;
   modifiedAt: string;
@@ -152,3 +155,5 @@ export type Insight = {
   total: number;
   trends: StatisticTrend[];
 };
+
+export type ThemedTextProps = TextProps & { toggleOnDark?: boolean; reverse?: boolean }

@@ -1,26 +1,26 @@
 import CryptoJS from "crypto-js";
-import Storage from "expo-sqlite/kv-store";
+import { getStoreItems, removeStoreItems, setStoreItems } from "./storeUtils";
 
 const hashPin = (pin: string) => {
   return CryptoJS.SHA256(pin).toString(CryptoJS.enc.Hex);
 };
 
 export const checkPinExists = async () => {
-  const value = await Storage.getItemAsync("hash");
-  return !!value;
+  const store = await getStoreItems("hash");
+  return !!store.hash;
 };
 
 export const updatePin = async (pin: string) => {
   const hash = hashPin(pin);
-  await Storage.setItemAsync("hash", hash);
+  await setStoreItems([["hash", hash]]);
 };
 
 export const verifyPin = async (pin: string) => {
-  const value = await Storage.getItemAsync("hash");
+  const store = await getStoreItems("hash");
   const hash = hashPin(pin);
-  return !value || hash === value;
+  return !store.hash || hash === store.hash;
 };
 
 export const removePin = async () => {
-  await Storage.removeItemAsync("hash");
+  await removeStoreItems("hash");
 };

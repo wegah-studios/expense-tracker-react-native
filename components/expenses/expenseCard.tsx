@@ -25,7 +25,11 @@ const ExpenseCard = React.memo(
     handlePress?: (index: number, sectionId?: string) => void;
     handleLongPress?: (index: number, sectionId?: string) => void;
   }) => {
-    const labels = useMemo(() => expense.label?.split(",") || [], [expense]);
+    const labels = useMemo(
+      () =>
+        expense.label && expense.label.length ? expense.label.split(",") : [],
+      [expense]
+    );
 
     const onPress = () => {
       if (handlePress) {
@@ -40,24 +44,6 @@ const ExpenseCard = React.memo(
         handlePress(index, sectionId);
       }
     };
-
-    // const handleLongPress = () => {
-    //   if (handleSelectItem) {
-    //     if (!selected) {
-    //       handleSelectItem(index, "add", sectionId);
-    //     }
-    //   } else {
-    //     handleEdit(index);
-    //   }
-    // };
-
-    // const handlePress = () => {
-    //   if (selectMode && handleSelectItem) {
-    //     handleSelectItem(index, selected ? "delete" : "add", sectionId);
-    //   } else {
-    //     handleEdit(index);
-    //   }
-    // };
 
     return (
       <Pressable

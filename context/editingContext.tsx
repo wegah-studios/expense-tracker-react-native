@@ -5,6 +5,7 @@ import ParseMessages from "@/components/edit/messages";
 import AddExpenseModal from "@/components/expenses/addExpenseModal";
 import FeedbackModal from "@/components/feedbackModal";
 import PinModal from "@/components/pinModal";
+import RatingModal from "@/components/ratingModal";
 import SmsRequestModal from "@/components/smsRequestModal";
 import StatusModal from "@/components/statusModal";
 import { tintColors } from "@/constants/colorSettings";
@@ -46,6 +47,7 @@ const EditingContext = createContext<{
       onBack?: () => void;
     }>
   >;
+  setRatingModal: React.Dispatch<React.SetStateAction<boolean>>;
   setAddExpenseModal: React.Dispatch<React.SetStateAction<boolean>>;
   setFeedbackModal: React.Dispatch<React.SetStateAction<boolean>>;
   handleStatusClose: () => void;
@@ -69,7 +71,7 @@ export const EditingContexProvider = ({
   const pathname = usePathname();
   const params = useLocalSearchParams();
 
-  const { smsCaptureState, pinProtected, updateSmsCaptureState } =
+  const { isRated, smsCaptureState, pinProtected, updateSmsCaptureState } =
     useCustomThemeContext();
   const [addExpenseModal, setAddExpenseModal] = useState<boolean>(false);
   const [feedbackModal, setFeedbackModal] = useState<boolean>(false);
@@ -81,7 +83,6 @@ export const EditingContexProvider = ({
       callback() {},
     },
   });
-
   const [props, setProps] = useState<EditingContextProps>({
     type: "",
     snapPoints: ["75%"],
@@ -94,6 +95,7 @@ export const EditingContexProvider = ({
     onComplete?: () => void;
     onBack?: () => void;
   }>({ mode: "" });
+  const [ratingModal, setRatingModal] = useState<boolean>(false);
   const [showPathInfo, setShowPathInfo] = useState<boolean>(false);
   const [initialCheck, setInitialCheck] = useState<boolean>(false);
 
@@ -139,9 +141,9 @@ export const EditingContexProvider = ({
     }
   }, [smsCaptureState]);
 
-  const handleOnActive = () => {
+  const handleOnActive = async () => {
     setShowPathInfo(false);
-    handleSmsCapture();
+    await handleSmsCapture();
   };
 
   const ref = useRef<BottomSheet>(null);
@@ -185,12 +187,12 @@ export const EditingContexProvider = ({
         });
         const report = await importFromSMSListener(messages);
         await clearStoredReceipts();
-        if (!report.complete && !report.incomplete) {
+        if (!report.complete && !report.incomplete && !report.excluded) {
           setStatus({
             open: true,
             type: "info",
             title: "No expenses found.",
-            message: "No expenses have been imported.",
+            message: "No expenses have been imported, please try again.",
             handleClose: handleStatusClose,
             action: {
               callback() {
@@ -207,6 +209,10 @@ export const EditingContexProvider = ({
           message: `New expenses imported:${
             report.complete
               ? `\n\n^icon|success^ ${report.complete} successfully added.`
+              : ""
+          }${
+            report.excluded
+              ? `\n\n^icon|info^ ${report.excluded} excluded expenses.`
               : ""
           }${
             report.incomplete
@@ -309,6 +315,12 @@ export const EditingContexProvider = ({
     setSmsRequestModal("");
   };
 
+  const handleFeedback = () => {
+    if (!isRated) {
+      setRatingModal(true);
+    }
+  };
+
   const open = (props: EditingContextProps) => {
     setProps({ ...props, close, setStatus, handleStatusClose });
     ref.current?.snapToIndex(0);
@@ -348,6 +360,7 @@ export const EditingContexProvider = ({
         showPathInfo,
         setStatus,
         setPinModal,
+        setRatingModal,
         setSmsRequestModal,
         handleStatusClose,
         setAddExpenseModal,
@@ -371,8 +384,9 @@ export const EditingContexProvider = ({
       <FeedbackModal
         open={feedbackModal}
         handleClose={() => setFeedbackModal(false)}
+        onComplete={handleFeedback}
       />
-
+      <RatingModal open={ratingModal} setOpen={setRatingModal} />
       <PinModal {...{ ...pinModal, setStatus, handleStatusClose }} />
       <AddExpenseModal
         open={addExpenseModal}

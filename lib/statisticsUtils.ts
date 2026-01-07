@@ -1,4 +1,4 @@
-import db from "@/db/schema";
+import db, { enqueueDB } from "@/db/db";
 import {
   Expense,
   HomeScope,
@@ -9,6 +9,7 @@ import {
 } from "@/types/common";
 import dayjs from "dayjs";
 import { formatAmount } from "./appUtils";
+import { updateStatisticsQuery } from "./queries";
 
 export const getPathString = (path: string[][]) => {
   const group = path[1].length
@@ -33,9 +34,11 @@ export const getPathString = (path: string[][]) => {
 };
 
 export const fetchPathInfo = async (path: string[][]) => {
-  const data: Statistic | null = await db.getFirstAsync(
-    `SELECT * FROM statistics WHERE path = ? AND total > 0 LIMIT 1`,
-    getPathString(path)
+  const data: Statistic | null = await enqueueDB(() =>
+    db.getFirstAsync(
+      `SELECT * FROM statistics WHERE path = ? AND total > 0 LIMIT 1`,
+      getPathString(path)
+    )
   );
 
   return { total: data?.total || 0, value: data?.value || "" };
@@ -57,11 +60,13 @@ export const fetchInsightTrends = async (
             option.value
           }/labels/${label}`
       );
-      const data = await db.getAllAsync(
-        `SELECT * FROM statistics WHERE path IN (?${`, ?`.repeat(
-          paths.length - 1
-        )})`,
-        paths
+      const data = await enqueueDB(() =>
+        db.getAllAsync(
+          `SELECT * FROM statistics WHERE path IN (?${`, ?`.repeat(
+            paths.length - 1
+          )})`,
+          paths
+        )
       );
 
       if (data.length > 1) {
@@ -106,10 +111,7 @@ export const fetchInsightTrends = async (
         nearestOptionPath[nearestOptionPath.length] = nearestOption.value;
         const diff = insight.total - nearestOption.total;
         trends.push({
-          title: `${diff < 0 ? "-" : "+"}Ksh ${formatAmount(
-            Math.abs(diff),
-            10000
-          )}`,
+          title: `${diff < 0 ? "-" : "+"}Ksh ${formatAmount(Math.abs(diff))}`,
           description: `${diff < 0 ? "less than" : "more than"} ${
             getPathTitles([nearestOptionPath, []]).title
           }`,
@@ -130,9 +132,11 @@ export const fetchInsightLabels = async (
     `/labels/%`;
 
   const offset = (page - 1) * 6;
-  const data: Statistic[] = await db.getAllAsync(
-    `SELECT * FROM statistics WHERE path LIKE ? AND total > 0 ORDER BY total DESC LIMIT 6 OFFSET ${offset} `,
-    query
+  const data: Statistic[] = await enqueueDB(() =>
+    db.getAllAsync(
+      `SELECT * FROM statistics WHERE path LIKE ? AND total > 0 ORDER BY total DESC LIMIT 6 OFFSET ${offset} `,
+      query
+    )
   );
 
   let result = data.reduce((arr, item, index) => {
@@ -152,10 +156,12 @@ export const fetchInsightOptions = async (path: string[][]) => {
     path[0].length
       ? path[0].join("/") + "/" + (path[0].length === 1 ? "months" : "dates")
       : `years`
-  }`;
-  const data: Statistic[] = await db.getAllAsync(
-    `SELECT * FROM statistics WHERE path LIKE ? AND total > 0 ORDER BY CAST(value AS INTEGER) ASC`,
-    query + "%"
+  }%`;
+  const data: Statistic[] = await enqueueDB(() =>
+    db.getAllAsync(
+      `SELECT * FROM statistics WHERE path LIKE ? AND total > 0 ORDER BY CAST(value AS INTEGER) ASC`,
+      query
+    )
   );
 
   let result: StatisticOption[] = data.map((item) => {
@@ -255,16 +261,18 @@ export const getHomeInsightOptions = async () => {
     2: [[date.getFullYear().toString(), date.getMonth().toString()], []],
   };
   let record: Map<string, StatisticOption[]> = new Map();
-  (
-    await Promise.all([
-      fetchInsightOptions(paths[0]),
-      fetchInsightOptions(paths[1]),
-      fetchInsightOptions(paths[2]),
-    ])
-  ).map((results, index) => {
+  let options: StatisticOption[][] = [];
+
+  for (let i = 0; i < 3; i++) {
+    const data = await fetchInsightOptions(paths[i]);
+    options.push(data);
+  }
+
+  options.map((results, index) => {
     const pathstring = getPathString(paths[index]);
     record.set(pathstring, results);
   });
+
   return record;
 };
 
@@ -280,11 +288,6 @@ export const getHomeInsightLabels = async (path: string[][]) => {
 
   return data;
 };
-
-export const parseHomeRecord = async (
-  record: Insight & { labels: Statistic[] },
-  options: Map<string, StatisticOption[]>
-) => {};
 
 export const months = [
   "Jan",
@@ -352,24 +355,18 @@ export const getStatisticsPaths = (dateString: string, label: string[]) => {
 
 export const updateStatistics = (
   expense: Partial<Expense>,
-  promises: Promise<any>[],
   mode: "add" | "delete" = "add"
 ) => {
+  let query = "";
   if (expense.date && expense.label && expense.amount) {
     const paths = getStatisticsPaths(expense.date, expense.label.split(","));
 
     for (let { path, value } of paths) {
-      promises.push(
-        db.runAsync(
-          `INSERT INTO statistics (path, value, total) VALUES (?, ?, ?)
-          ON CONFLICT(path)
-          DO UPDATE SET total = total ${mode === "add" ? "+ " : "- "} ?;`,
-          path,
-          value,
-          expense.amount,
-          expense.amount
-        )
+      query += updateStatisticsQuery(
+        { path, value, total: expense.amount },
+        mode
       );
     }
   }
+  return query;
 };

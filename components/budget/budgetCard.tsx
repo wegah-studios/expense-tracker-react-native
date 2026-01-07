@@ -3,7 +3,7 @@ import icons from "@/constants/icons";
 import { formatAmount } from "@/lib/appUtils";
 import { Budget } from "@/types/common";
 import dayjs from "dayjs";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import LabelChip from "../expenses/labelChip";
 import ThemedText from "../textThemed";
@@ -23,7 +23,6 @@ const BudgetCard = React.memo(
     handlePress?: (id: string, index: number) => void;
     handleLongPress?: (id: string, index: number) => void;
   }) => {
-    const barRef = useRef<View>(null);
     const [barWidth, setBarWidth] = useState<number>(0);
     const labels = useMemo(() => budget.label?.split(",") || [], [budget]);
 
@@ -133,7 +132,7 @@ const BudgetCard = React.memo(
               </ThemedText>
             </View>
           ) : (
-            budget.repeat && (
+            !!budget.repeat && (
               <ThemedIcon
                 toggleOnDark={selected}
                 reverse={selected}

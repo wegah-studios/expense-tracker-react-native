@@ -1,4 +1,4 @@
-import db from "@/db/schema";
+import db from "@/db/db";
 import { Notification } from "@/types/common";
 import { nanoid } from "nanoid/non-secure";
 
@@ -42,7 +42,7 @@ export const deleteNofications = async (selected: Set<string>) => {
 
 export const clearUnread = async (ids: string[]) => {
   await db.runAsync(
-    `UPDATE notifications SET unread = false WHERE id IN (?${`, ?`.repeat(
+    `UPDATE notifications SET unread = 0 WHERE id IN (?${`, ?`.repeat(
       ids.length - 1
     )})`,
     ids

@@ -1,4 +1,4 @@
-import db, { schema } from "@/db/schema";
+import db, { schema } from "@/db/db";
 import { Log, Rating } from "@/types/common";
 import { enc, HmacSHA256 } from "crypto-js";
 import dayjs from "dayjs";
@@ -9,7 +9,6 @@ import * as MailComposer from "expo-mail-composer";
 import { ToastAndroid } from "react-native";
 import { stopCapture } from "react-native-sms-listener";
 import { zip } from "react-native-zip-archive";
-import { removePin } from "./pinUtils";
 
 const LOGS_INTEGRITY = `308c92676fa959739801af19e74098d15d5813627ff6f3ae65b267c1a1676605`;
 export const logs: string[] = [];
@@ -50,6 +49,33 @@ export const formatAmount = (amount: number, max: number = 1000) => {
   );
 };
 
+export function formatQueryValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "NULL";
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "NULL";
+    return value.toString();
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "1" : "0";
+  }
+
+  if (value instanceof Date) {
+    return `'${value.toISOString().replace(/'/g, "''")}'`;
+  }
+
+  if (Array.isArray(value) || typeof value === "object") {
+    // JSON-encode complex values
+    return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+  }
+
+  // string (default)
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 export const getDateSuffix = (date: string) => {
   const lastChar = date.slice(-1);
   const no = Number(date);
@@ -65,32 +91,29 @@ export const getDateSuffix = (date: string) => {
   }
 };
 
-export const getTimeAgo = (endDate: Date, startDate?: Date) => {};
-
 export const toastError = (error: any, fallback?: string) => {
   ToastAndroid.show(
     error.cause === 1 ? error.message : fallback || `An error occured`,
     ToastAndroid.SHORT
   );
   addLog({ type: "error", content: `${error}` });
-  // console.error(error);
+  console.error(error);
 };
 
 export const factoryReset = async () => {
   await db.withTransactionAsync(async () => {
     await Promise.all([
       db.execAsync(`
-    DROP TABLE expenses;
-    DROP TABLE statistics;
-    DROP TABLE collections;
-    DROP TABLE dictionary;
-    DROP TABLE budgets;
-    DROP TABLE preferences;
-    DROP TABLE notifications;
+    DROP TABLE IF EXISTS expenses;
+    DROP TABLE IF EXISTS statistics;
+    DROP TABLE IF EXISTS collections;
+    DROP TABLE IF EXISTS dictionary;
+    DROP TABLE IF EXISTS budgets;
+    DROP TABLE IF EXISTS notifications;
+    DROP TABLE IF EXISTS store;
     ${schema}
     `),
       stopCapture(),
-      removePin(),
       FileSystem.deleteAsync(`${FileSystem.documentDirectory}images`, {
         idempotent: true,
       }),

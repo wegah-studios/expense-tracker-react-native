@@ -16,6 +16,7 @@ const LabelInput = ({
   changed,
   touched,
   error,
+  disabled,
   helperText,
   placeholderText,
   setErrors,
@@ -33,6 +34,7 @@ const LabelInput = ({
   changed: boolean;
   touched: boolean;
   error: string;
+  disabled?: boolean;
   helperText?: string;
   placeholderText?: string;
   setErrors: any;
@@ -155,6 +157,7 @@ const LabelInput = ({
       </ThemedText>
       <View className=" flex-col gap-[5px] ">
         <Pressable
+          disabled={!!disabled}
           onPress={handlePress}
           className={` flex-row p-[10px] rounded-[10px] border ${
             touched && error
@@ -191,6 +194,7 @@ const LabelInput = ({
               {value?.map((item, index) => (
                 <LabelChip
                   key={index}
+                  disabled={!!disabled}
                   name={item}
                   index={index}
                   onPress={handlePress}

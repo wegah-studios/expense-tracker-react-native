@@ -12,7 +12,11 @@ import ThemedIcon from "../themedIcon";
 
 const Messages = (props: Record<string, any>) => {
   const { handleUpdate, close, setStatus, handleStatusClose } = props as {
-    handleUpdate: (report: { complete: number; incomplete: number }) => void;
+    handleUpdate: (report: {
+      complete: number;
+      incomplete: number;
+      excluded: number;
+    }) => void;
     close: () => void;
     setStatus: React.Dispatch<React.SetStateAction<Status>>;
     handleStatusClose: () => void;

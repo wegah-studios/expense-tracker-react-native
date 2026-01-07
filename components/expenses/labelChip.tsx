@@ -10,18 +10,21 @@ const LabelChip = ({
   size = "md",
   color = "grey",
   name,
+  disabled,
   onPress,
   onCancel,
 }: {
   index: number;
   size?: "md" | "sm";
   color?: "dark" | "grey" | "theme";
+  disabled?: boolean;
   name: string;
   onPress?: (index: number) => void;
   onCancel?: (index: number) => void;
 }) => {
   return (
     <Pressable
+      disabled={!!disabled}
       onPress={() => onPress && onPress(index)}
       className={` p-[10px] pt-[5px] pb-[5px] rounded-[20px] flex-row gap-2 items-center ${
         color === "theme"
@@ -39,7 +42,11 @@ const LabelChip = ({
         {name}
       </ThemedText>
       {onCancel && (
-        <Pressable hitSlop={5} onPress={() => onCancel(index)}>
+        <Pressable
+          disabled={!!disabled}
+          hitSlop={5}
+          onPress={() => onCancel(index)}
+        >
           <ThemedIcon
             toggleOnDark={color === "theme"}
             reverse={color !== "theme"}

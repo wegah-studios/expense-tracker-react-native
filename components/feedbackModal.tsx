@@ -11,9 +11,11 @@ import ThemedIcon from "./themedIcon";
 const FeedbackModal = ({
   open,
   handleClose,
+  onComplete,
 }: {
   open: boolean;
   handleClose: () => void;
+  onComplete: () => void;
 }) => {
   const [form, setForm] = useState<{
     name: string;
@@ -27,6 +29,7 @@ const FeedbackModal = ({
       handleClose();
       setForm({ name: "", message: "", rating: null });
       await sendFeedback(feedback);
+      onComplete()
     } catch (error) {
       toastError(error, `There was an error sending feedback`);
     }

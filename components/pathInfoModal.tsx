@@ -2,11 +2,11 @@ import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
 import { useCustomThemeContext } from "@/context/themeContext";
 import { toastError } from "@/lib/appUtils";
-import { getPreferences, setPreferences } from "@/lib/preferenceUtils";
+import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
 import { usePathname } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable } from "react-native";
-import ExternalLink from "./externalLink";
+import FormattedText from "./formattedText";
 import ThemedText from "./textThemed";
 import ThemedIcon from "./themedIcon";
 
@@ -24,7 +24,7 @@ const PathInfoModal = () => {
         {
           icon: icons.logo,
           title: `Important note`,
-          description: `All your data is stored securely on your device and only you have access to it. By using this app you agree to our ^Terms of use</>https://qwantu.wegahstudios.com/terms-of-service^ and ^Privacy policy</>https://qwantu.wegahstudios.com/privacy-policy^.`,
+          description: `All your data is stored securely on your device and only you have access to it. By using this app you agree to our ^link|Terms of use:https://qwantu.wegahstudios.com/terms-of-service^ and ^link|Privacy policy:https://qwantu.wegahstudios.com/privacy-policy^.`,
         },
         {
           icon: icons.logo,
@@ -85,21 +85,25 @@ const PathInfoModal = () => {
       setOpen(false);
     } else {
       if (content[pathname] && !seen.has(pathname)) {
-        const fetchPreferences = async () => {
-          const preferences = await getPreferences(pathname);
-          let currentStep = 0;
-          if (preferences[pathname] !== undefined) {
-            currentStep = Number(preferences[pathname]);
-          }
-          if (currentStep !== -1) {
-            setInfo(content[pathname]);
-            setStep(currentStep);
-            setOpen(true);
-          } else {
-            addPathnameToSeen();
+        const fetchStorage = async () => {
+          try {
+            const storage = await getStoreItems(pathname);
+            let currentStep = 0;
+            if (storage[pathname] !== undefined) {
+              currentStep = Number(storage[pathname]);
+            }
+            if (currentStep !== -1) {
+              setInfo(content[pathname]);
+              setStep(currentStep);
+              setOpen(true);
+            } else {
+              addPathnameToSeen();
+            }
+          } catch (error) {
+            toastError(error);
           }
         };
-        fetchPreferences();
+        fetchStorage();
       }
     }
   }, [pathname, showPathInfo, seen]);
@@ -125,7 +129,7 @@ const PathInfoModal = () => {
       } else {
         setStep(nextStep);
       }
-      setPreferences({ [pathname]: `${nextStep}` });
+      setStoreItems([[pathname, `${nextStep}`]]);
     } catch (error) {
       toastError(error);
     }
@@ -165,18 +169,14 @@ const PathInfoModal = () => {
               <ThemedText className=" font-urbanistBold text-[1.5rem] text-center ">
                 {active.title}
               </ThemedText>
-              <ThemedText className=" tracking-[0.1em] text-center text-[1.2rem] ">
-                {active.description.split("^").map((str, index) => {
-                  const [text, link] = str.split("</>");
-                  return !!link ? (
-                    <ExternalLink key={index} href={link}>
-                      {text}
-                    </ExternalLink>
-                  ) : (
-                    text
-                  );
-                })}
-              </ThemedText>
+              <FormattedText
+                text={active.description}
+                props={{
+                  container: {
+                    className: " tracking-[0.1em] text-center text-[1.2rem] ",
+                  },
+                }}
+              />
               <Pressable
                 onPress={handleClose}
                 className={` flex-row gap-2 p-[20px] pt-[10px] pb-[10px] rounded-[20px] bg-black dark:bg-white `}

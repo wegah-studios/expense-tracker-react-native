@@ -2,7 +2,7 @@ import { tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { useCustomThemeContext } from "@/context/themeContext";
 import { normalizeString, toastError } from "@/lib/appUtils";
-import { updateBudget } from "@/lib/budgetUtils";
+import { updateBudgets } from "@/lib/budgetUtils";
 import validateInput from "@/lib/validateInput";
 import { Budget, Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
@@ -252,8 +252,6 @@ const EditBudget = (props: Record<string, any>) => {
     }
   };
 
-  //todo: confirm custom change, end date errors
-
   const handleDateChange = (event: DateTimePickerEvent, newDate?: Date) => {
     setDatePicker((prev) => ({ ...prev, open: Platform.OS === "ios" }));
     if (newDate) {
@@ -376,8 +374,8 @@ const EditBudget = (props: Record<string, any>) => {
         }
         update.id = budget.id;
 
-        let result = await updateBudget(
-          update,
+        let [result] = await updateBudgets(
+          [update],
           mode === "edit" ? "update" : "add"
         );
         result = { ...budget, ...result };
