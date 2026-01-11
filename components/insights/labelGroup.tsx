@@ -1,4 +1,4 @@
-import { Statistic } from "@/types/common";
+import { Currency, Statistic } from "@/types/common";
 import React from "react";
 import { View } from "react-native";
 import LabelCard from "./labelCard";
@@ -7,11 +7,13 @@ const StatisticLabelGroup = ({
   total,
   index,
   group,
+  currency,
   handleLabelPress,
 }: {
   total: number;
   index: number;
   group: Statistic[];
+  currency:Currency
   handleLabelPress: (value: string) => void;
 }) => {
   return (
@@ -20,6 +22,7 @@ const StatisticLabelGroup = ({
         <LabelCard
           key={i}
           {...stat}
+          currency={currency}
           index={index + i}
           percent={stat.total / total}
           onPress={handleLabelPress}

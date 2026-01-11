@@ -330,6 +330,7 @@ const InsightsPage = () => {
               handleLabelPress={handleLabelPress}
               index={index}
               group={group}
+              currency={currency}
             />
           )}
           ListHeaderComponent={() => (

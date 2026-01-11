@@ -235,6 +235,7 @@ const EditDictionary = (props: Record<string, any>) => {
             <LabelInput
               required={true}
               value={form.label}
+              showBorder={false}
               placeHolder="e.g Groceries"
               helperText={`Enter the label you want to assign for the above ${matchType}.`}
               handleBlur={handleBlur}
