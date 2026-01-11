@@ -1,7 +1,7 @@
 import { colorCycle } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { formatAmount } from "@/lib/appUtils";
-import { Expense } from "@/types/common";
+import { Currency, Expense } from "@/types/common";
 import dayjs from "dayjs";
 import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
@@ -13,6 +13,7 @@ const ExpenseCard = React.memo(
   ({
     index,
     expense,
+    currency,
     selected = false,
     sectionId,
     handlePress,
@@ -20,6 +21,7 @@ const ExpenseCard = React.memo(
   }: {
     index: number;
     expense: Partial<Expense>;
+    currency: Currency;
     selected?: boolean;
     sectionId?: string;
     handlePress?: (index: number, sectionId?: string) => void;
@@ -96,10 +98,7 @@ const ExpenseCard = React.memo(
               } `}
             >
               {expense.amount
-                ? "-" +
-                  expense.currency +
-                  " " +
-                  formatAmount(expense.amount, 10000)
+                ? `-${currency} ${formatAmount(expense.amount, 10000)}`
                 : "amount: missing"}
             </ThemedText>
           </View>

@@ -18,7 +18,7 @@ export type Expense = {
 };
 
 export type ExpenseForm = {
-  label: string[];
+  label: string;
   amount?: string;
   recipient?: string;
   ref?: string;
@@ -99,7 +99,7 @@ export type Budget = {
   total: number;
   current: number;
   duration: "year" | "month" | "week" | "custom";
-  repeat: number;
+  repeat: 1|0;
 };
 
 export type DictionaryItemType = "keyword" | "recipient";
@@ -157,3 +157,5 @@ export type Insight = {
 };
 
 export type ThemedTextProps = TextProps & { toggleOnDark?: boolean; reverse?: boolean }
+
+export type Currency = "KSh" | "TSh" | "MT" | "FC" | "GH₵" | "LE" | "Br"

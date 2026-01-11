@@ -11,6 +11,7 @@ import { editMultipleExpenses, updateExpenses } from "@/lib/expenseUtils";
 import { dowloadImage } from "@/lib/imageUtils";
 import validateInput from "@/lib/validateInput";
 import {
+  Currency,
   Expense,
   ExpenseForm,
   ExpenseFormErrors,
@@ -22,6 +23,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
 import * as FileSystem from "expo-file-system/legacy";
+import { nanoid } from "nanoid/non-secure";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ToastAndroid, View } from "react-native";
 import MoveModal from "../expenses/moveModal";
@@ -37,12 +39,14 @@ const EditExpense = (props: Record<string, any>) => {
     mode,
     readonly,
     expenses,
+    currency,
     handleUpdate,
     close,
     setStatus,
     handleStatusClose,
   } = props as {
     mode: "add" | "edit" | "multiple";
+    currency: Currency;
     readonly?: boolean;
     indices?: number[];
     expenses: Partial<Expense>[];
@@ -51,8 +55,7 @@ const EditExpense = (props: Record<string, any>) => {
     handleStatusClose: () => void;
     close: () => void;
   };
-  const [form, setForm] = useState<ExpenseForm>({ label: [] });
-  const [labelInput, setLabelInput] = useState<string>("");
+  const [form, setForm] = useState<ExpenseForm>({ label: "" });
   const [errors, setErrors] = useState<ExpenseFormErrors>({
     label: "",
     amount: "",
@@ -107,7 +110,7 @@ const EditExpense = (props: Record<string, any>) => {
   useEffect(() => {
     setForm({
       ...expense,
-      label: expense.label ? expense.label.split(",") : [],
+      label: expense.label ? expense.label : "",
       date: expense.date
         ? new Date(expense.date)
         : mode === "multiple"
@@ -118,7 +121,6 @@ const EditExpense = (props: Record<string, any>) => {
         ? `${FileSystem.documentDirectory}images/${expense.image}`
         : undefined,
     });
-    setLabelInput(expense.label?.replaceAll(",", ", ") || "");
     setErrors({
       label: expense.label || mode === "multiple" ? "" : "required",
       amount: expense.amount || mode === "multiple" ? "" : "required",
@@ -148,8 +150,11 @@ const EditExpense = (props: Record<string, any>) => {
     const normalized = normalizeString(value);
 
     setChanges((prev) => {
-      const existing = expense[name as keyof typeof form];
-      const isDiff = normalized !== (existing ? String(existing) : "");
+      const existing = expense[name as keyof typeof form]?.toString() || "";
+      let isDiff = normalized !== existing;
+      if (name === "label") {
+        isDiff = normalized.replace(/\s*,\s*/g, ",") !== existing;
+      }
       if (isDiff !== prev.has(name)) {
         const newSet = new Set(prev);
         if (isDiff && (mode !== "multiple" || normalized)) {
@@ -224,8 +229,10 @@ const EditExpense = (props: Record<string, any>) => {
       setStatus({
         open: true,
         type: "loading",
-        title: mode === "add" ?  "Adding" : "Updating",
-        message: `${mode === "add" ? "adding" : "Updating"} expense${mode === "multiple" ? "s" :""}, please wait`,
+        title: mode === "add" ? "Adding" : "Updating",
+        message: `${mode === "add" ? "adding" : "Updating"} expense${
+          mode === "multiple" ? "s" : ""
+        }, please wait`,
         handleClose: handleStatusClose,
         action: {
           callback() {},
@@ -236,11 +243,12 @@ const EditExpense = (props: Record<string, any>) => {
         let update: Map<number, Partial<Expense>> = new Map();
 
         for (let change of [...changes]) {
-          let value: string | number = "";
+          let value: string | number | null = "";
           switch (change) {
             case "label":
-              value =
-                form.label?.map((str) => normalizeString(str)).join(",") || "";
+              value = form.label
+                ? normalizeString(form.label).replace(/\s*,\s*/g, ",")
+                : null;
               break;
             case "date":
               value = form.date?.toISOString() || "";
@@ -272,6 +280,13 @@ const EditExpense = (props: Record<string, any>) => {
             const edits = edit;
             edit = { ...expense, ...edits };
           }
+
+          if (mode === "add") {
+            edit.id = nanoid();
+            edit.currency = currency;
+            edit.collection = "expenses";
+          }
+
           await updateExpenses(
             [edit],
             mode === "add" ? "add" : "update",
@@ -296,7 +311,8 @@ const EditExpense = (props: Record<string, any>) => {
         setStatus({
           open: true,
           type: "error",
-          message: "An error occured while updating expenses, please try again.",
+          message:
+            "An error occured while updating expenses, please try again.",
           handleClose: handleStatusClose,
           action: {
             callback() {
@@ -471,22 +487,16 @@ const EditExpense = (props: Record<string, any>) => {
             </View>
           )}
           <LabelInput
-            {...{
-              disabled: readonly,
-              expenseValue: expense.label,
-              value: form.label,
-              input: labelInput,
-              required: mode !== "multiple",
-              changed: changes.has("label"),
-              touched: changes.has("label"),
-              error: errors.label,
-              setForm,
-              setErrors,
-              setChanges,
-              setTouched,
-              setInput: setLabelInput,
-              handleInputFocus,
-            }}
+            required={mode !== "multiple"}
+            disabled={readonly}
+            value={form.label}
+            placeHolder="e.g Transport, fuel"
+            handleBlur={handleBlur}
+            handleChange={handleChange}
+            error={errors.label}
+            touched={touched.has("label")}
+            changed={changes.has("label")}
+            handleFocus={() => handleInputFocus(10)}
           />
           <Pressable
             disabled={!!readonly}
@@ -518,7 +528,7 @@ const EditExpense = (props: Record<string, any>) => {
               {...{
                 disabled: readonly,
                 value: form.recipient || "",
-                placeHolder: "e.g Mr John",
+                placeHolder: "e.g Shell petrol station",
                 changed: changes.has("recipient"),
                 touched: changes.has("recipient"),
                 error: errors.recipient,
@@ -530,7 +540,7 @@ const EditExpense = (props: Record<string, any>) => {
             <InputField
               editable={!readonly}
               name="amount"
-              placeholder="e.g Ksh 500"
+              placeholder={`e.g ${currency} 5,000`}
               required
               value={form.amount}
               handleChange={handleChange}
@@ -598,7 +608,7 @@ const EditExpense = (props: Record<string, any>) => {
               editable={!readonly}
               name="ref"
               label="Reference ID"
-              placeholder="e.g HMDLX123"
+              placeholder="e.g ABC123"
               value={form.ref}
               handleChange={handleChange}
               handleBlur={handleBlur}

@@ -1,8 +1,8 @@
 import icons from "@/constants/icons";
 import { toastError } from "@/lib/appUtils";
 import { importExpenses, importStatement } from "@/lib/exportUtils";
-import { EditingContextProps, Status } from "@/types/common";
-import { Href, router, usePathname } from "expo-router";
+import { Currency, EditingContextProps, Status } from "@/types/common";
+import { router, usePathname } from "expo-router";
 import React, { useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import ImportFileModal from "../importFileModal";
@@ -11,16 +11,25 @@ import ThemedIcon from "../themedIcon";
 
 const AddExpenseModal = ({
   open,
+  currency,
   openEditSheet,
   setStatus,
   handleStatusClose,
   handleClose,
+  handleReport,
 }: {
   open: boolean;
+  currency: Currency;
   openEditSheet: (props: EditingContextProps) => void;
   setStatus: React.Dispatch<React.SetStateAction<Status>>;
   handleStatusClose: () => void;
   handleClose: () => void;
+  handleReport: (report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  }) => void;
 }) => {
   const pathname = usePathname();
   const [fileModal, setFileModal] = useState<{
@@ -66,56 +75,6 @@ const AddExpenseModal = ({
     handleClose();
   };
 
-  const handleReport = (report: {
-    complete: number;
-    incomplete: number;
-    excluded: number;
-  }) => {
-    if (!report.complete && !report.incomplete && !report.excluded) {
-      setStatus({
-        open: true,
-        type: "info",
-        title: "No expenses found.",
-        message: "No expenses have been imported, please try again.",
-        handleClose: handleStatusClose,
-        action: {
-          callback: handleStatusClose,
-        },
-      });
-    }
-    setStatus({
-      open: true,
-      type: "info",
-      title: "Expenses imported",
-      message: `New expenses imported:${
-        report.complete
-          ? `\n\n^icon|success^ ${report.complete} successfully added.`
-          : ""
-      }${
-        report.excluded
-          ? `\n\n^icon|info^ ${report.excluded} excluded expenses.`
-          : ""
-      }${
-        report.incomplete
-          ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
-          : ""
-      }`,
-      handleClose: handleStatusClose,
-      action: {
-        title: "View",
-        callback() {
-          const path: Href = "/expenses/collections";
-          if (pathname !== "/expenses/collections") {
-            router.push(path);
-          } else {
-            router.replace(path);
-          }
-          handleStatusClose();
-        },
-      },
-    });
-  };
-
   const handleStatement = () => {
     handleClose();
     setFileModal({
@@ -148,15 +107,21 @@ const AddExpenseModal = ({
           callback() {},
         },
       });
-      let report = {
+      let report: {
+        complete: number;
+        incomplete: number;
+        excluded: number;
+        currencyChange: Currency | null;
+      } = {
         complete: 0,
         incomplete: 0,
         excluded: 0,
+        currencyChange: null,
       };
       if (fileModal.type === "excel") {
-        report = await importExpenses(uri);
+        report = await importExpenses(uri, currency);
       } else if (fileModal.type === "pdf") {
-        report = await importStatement(uri);
+        report = await importStatement(uri, currency);
       }
       handleReport(report);
     } catch (error) {

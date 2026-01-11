@@ -20,7 +20,7 @@ import {
 import * as Progress from "react-native-progress";
 
 const Collections = () => {
-  const { loading, collections, setCollections } = useAppProps() as {
+  const { loading, collections, setCollections, fetchCollections } = useAppProps() as {
     loading: boolean;
     collections: {
       map: Map<string, number>;
@@ -32,6 +32,7 @@ const Collections = () => {
         names: string[];
       }>
     >;
+    fetchCollections: () => Promise<void>
   };
 
   const { setStatus, handleStatusClose } = useEditingContext();
@@ -168,6 +169,7 @@ const Collections = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
+      fetchCollections()
       router.replace("/expenses/collections");
     }, 500);
   };

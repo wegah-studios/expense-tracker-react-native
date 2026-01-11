@@ -1,6 +1,6 @@
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { getRecipients } from "@/lib/expenseUtils";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import InputField from "./inputField";
@@ -8,6 +8,7 @@ import ThemedText from "./textThemed";
 
 const RecipientInput = ({
   value,
+  name,
   placeHolder,
   changed,
   touched,
@@ -18,6 +19,7 @@ const RecipientInput = ({
   handleFocus,
 }: {
   value: string;
+  name?: string;
   placeHolder?: string;
   error?: string;
   touched?: boolean;
@@ -30,6 +32,7 @@ const RecipientInput = ({
   const [editMode, setEditMode] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [inputTimeout, setInputTimeout] = useState<number | null>(null);
+  const inputName = useMemo(() => name || "recipient", [name]);
 
   useEffect(() => {
     setInputTimeout((prev) => {
@@ -61,7 +64,7 @@ const RecipientInput = ({
   };
 
   const handleSuggestionPress = (suggestion: string) => {
-    handleChange("recipient", suggestion);
+    handleChange(inputName, suggestion);
     setEditMode(false);
   };
 
@@ -74,18 +77,18 @@ const RecipientInput = ({
 
   const onFocus = () => {
     setEditMode(true);
-    handleFocus && handleFocus("recipient");
+    handleFocus && handleFocus(inputName);
   };
   const onBlur = () => {
     setEditMode(false);
-    handleBlur("recipient");
+    handleBlur(inputName);
   };
 
   return (
     <View className={` flex-col gap-[10px] `}>
       <InputField
         editable={!disabled}
-        name="recipient"
+        name={inputName}
         placeholder={placeHolder}
         required
         value={value}

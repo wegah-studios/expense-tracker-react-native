@@ -1,5 +1,6 @@
 import db, { enqueueDB } from "@/db/db";
 import {
+  Currency,
   Expense,
   HomeScope,
   Insight,
@@ -46,7 +47,8 @@ export const fetchPathInfo = async (path: string[][]) => {
 
 export const fetchInsightTrends = async (
   insight: Insight,
-  options: Map<string, StatisticOption[]>
+  options: Map<string, StatisticOption[]>,
+  currency:Currency
 ) => {
   let trends: StatisticTrend[] = [];
   if (insight.path[1].length) {
@@ -71,7 +73,7 @@ export const fetchInsightTrends = async (
 
       if (data.length > 1) {
         trends.push({
-          title: `Ksh ${formatAmount(insight.total / data.length)}`,
+          title: `-${currency} ${formatAmount(insight.total / data.length)}`,
           description: `spent on ${insight.value} per ${
             !insight.path[0].length
               ? "year"
@@ -87,7 +89,7 @@ export const fetchInsightTrends = async (
     const selectedOptions = options.get(key);
     if (selectedOptions && selectedOptions.length > 1) {
       trends.push({
-        title: `-Ksh ${formatAmount(insight.total / selectedOptions.length)}`,
+        title: `-${currency} ${formatAmount(insight.total / selectedOptions.length)}`,
         description: `per ${
           !insight.path[0].length
             ? "year"
@@ -111,7 +113,7 @@ export const fetchInsightTrends = async (
         nearestOptionPath[nearestOptionPath.length] = nearestOption.value;
         const diff = insight.total - nearestOption.total;
         trends.push({
-          title: `${diff < 0 ? "-" : "+"}Ksh ${formatAmount(Math.abs(diff))}`,
+          title: `${diff < 0 ? "-" : "+"}${currency} ${formatAmount(Math.abs(diff))}`,
           description: `${diff < 0 ? "less than" : "more than"} ${
             getPathTitles([nearestOptionPath, []]).title
           }`,

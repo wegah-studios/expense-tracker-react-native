@@ -3,7 +3,7 @@ import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
 import { toastError } from "@/lib/appUtils";
 import { getHomeBudget } from "@/lib/budgetUtils";
-import { Budget } from "@/types/common";
+import { Budget, Currency } from "@/types/common";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Image, Pressable, View } from "react-native";
@@ -13,8 +13,10 @@ import ThemedText from "../textThemed";
 
 const HomeBudgetWidget = ({
   scope,
+  currency,
 }: {
   scope: number;
+  currency: Currency;
 }) => {
   const { open } = useEditingContext();
   const [record, setRecord] = useState<Map<number, Budget | null>>(new Map());
@@ -42,7 +44,7 @@ const HomeBudgetWidget = ({
         toastError(error, `An error occured while fetching budget`);
       }
     };
-    fetchBudget()
+    fetchBudget();
   }, [scope]);
 
   const handlePress = () => {
@@ -68,7 +70,12 @@ const HomeBudgetWidget = ({
       <Progress.CircleSnail color={["#3b82f6", "#10b981"]} />
     </View>
   ) : budget ? (
-    <BudgetCard index={scope + 1} budget={budget} handlePress={handlePress} />
+    <BudgetCard
+      index={scope + 1}
+      budget={budget}
+      currency={currency}
+      handlePress={handlePress}
+    />
   ) : (
     <Pressable
       onPress={handlePress}

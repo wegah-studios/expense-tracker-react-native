@@ -12,17 +12,18 @@ const ExpensesLayout = () => {
   }>({ map: new Map(), names: [], exclusions: [] });
 
   useEffect(() => {
-    const fetchCollections = async () => {
-      setLoading(true);
-      const data = await getCollections();
-      setCollections(data);
-      setLoading(false);
-    };
     fetchCollections();
   }, []);
 
+  const fetchCollections = async () => {
+    setLoading(true);
+    const data = await getCollections();
+    setCollections(data);
+    setLoading(false);
+  };
+
   return (
-    <AppPropsProvider value={{ loading, collections, setCollections }}>
+    <AppPropsProvider value={{ loading, collections, setCollections, fetchCollections }}>
       <Slot />
     </AppPropsProvider>
   );

@@ -11,9 +11,10 @@ import StatusModal from "@/components/statusModal";
 import { tintColors } from "@/constants/colorSettings";
 import { toastError } from "@/lib/appUtils";
 import { handleSmsEvent, importFromSMSListener } from "@/lib/expenseUtils";
-import { EditingContextProps, Status } from "@/types/common";
+import { setStoreItems } from "@/lib/storeUtils";
+import { Currency, EditingContextProps, Status } from "@/types/common";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { router, useLocalSearchParams, usePathname } from "expo-router";
+import { Href, router, useLocalSearchParams, usePathname } from "expo-router";
 import React, {
   createContext,
   useCallback,
@@ -71,8 +72,14 @@ export const EditingContexProvider = ({
   const pathname = usePathname();
   const params = useLocalSearchParams();
 
-  const { isRated, smsCaptureState, pinProtected, updateSmsCaptureState } =
-    useCustomThemeContext();
+  const {
+    currency,
+    setCurrency,
+    isRated,
+    smsCaptureState,
+    pinProtected,
+    updateSmsCaptureState,
+  } = useCustomThemeContext();
   const [addExpenseModal, setAddExpenseModal] = useState<boolean>(false);
   const [feedbackModal, setFeedbackModal] = useState<boolean>(false);
   const [status, setStatus] = useState<Status>({
@@ -123,7 +130,7 @@ export const EditingContexProvider = ({
       addOnMessageCapturedListener((message) => {
         const onSmsEvent = async () => {
           try {
-            await handleSmsEvent(message);
+            await handleSmsEvent(message, currency);
             await deleteReceipt(message.id);
             ToastAndroid.show(
               "New expense imported, reload to see changes",
@@ -185,49 +192,9 @@ export const EditingContexProvider = ({
             callback: handleStatusClose,
           },
         });
-        const report = await importFromSMSListener(messages);
+        const report = await importFromSMSListener(messages, currency);
         await clearStoredReceipts();
-        if (!report.complete && !report.incomplete && !report.excluded) {
-          setStatus({
-            open: true,
-            type: "info",
-            title: "No expenses found.",
-            message: "No expenses have been imported, please try again.",
-            handleClose: handleStatusClose,
-            action: {
-              callback() {
-                handleStatusClose();
-                setShowPathInfo(true);
-              },
-            },
-          });
-        }
-        setStatus({
-          open: true,
-          type: "info",
-          title: "Expenses imported",
-          message: `New expenses imported:${
-            report.complete
-              ? `\n\n^icon|success^ ${report.complete} successfully added.`
-              : ""
-          }${
-            report.excluded
-              ? `\n\n^icon|info^ ${report.excluded} excluded expenses.`
-              : ""
-          }${
-            report.incomplete
-              ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
-              : ""
-          }`,
-          handleClose: handleStatusClose,
-          action: {
-            callback() {
-              router.replace({ pathname: pathname as any, params });
-              handleStatusClose();
-              setShowPathInfo(true);
-            },
-          },
-        });
+        handleReport(report);
       } else {
         handleStatusClose();
         setShowPathInfo(true);
@@ -246,6 +213,116 @@ export const EditingContexProvider = ({
           },
         },
       });
+    }
+  };
+
+  const handleReport = (report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  }) => {
+    if (!report.complete && !report.incomplete && !report.excluded) {
+      setStatus({
+        open: true,
+        type: "info",
+        title: "No expenses found.",
+        message: "No expenses have been imported, please try again.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+      return
+    }
+    setStatus({
+      open: true,
+      type: "info",
+      title: "Expenses imported",
+      message: `New expenses imported:${
+        report.complete
+          ? `\n\n^icon|success^ ${report.complete} successfully added.`
+          : ""
+      }${
+        report.excluded
+          ? `\n\n^icon|info^ ${report.excluded} excluded expenses.`
+          : ""
+      }${
+        report.incomplete
+          ? `\n\n^icon|error^ ${report.incomplete} incomplete expenses.`
+          : ""
+      }`,
+      handleClose: handleStatusClose,
+      action: {
+        title: "View",
+        callback() {
+          if (report.currencyChange) {
+            setStatus({
+              open: true,
+              type: "warning",
+              title: "Update currency?",
+              message: `Currency change detected: \n\nChange currency from ^b|'${currency}'^ to ^b|'${report.currencyChange}'^`,
+              handleClose: handleStatusClose,
+              action: {
+                async callback() {
+                  try {
+                    setStatus({
+                      open: true,
+                      type: "loading",
+                      message: "Updating currency, please wait",
+                      handleClose: handleStatusClose,
+                      action: {
+                        callback: handleStatusClose,
+                      },
+                    });
+                    await setStoreItems([
+                      ["currency", report.currencyChange as any],
+                    ]);
+                    setCurrency(report.currencyChange as any);
+                    setStatus({
+                      open: true,
+                      type: "success",
+                      title: "Currency updated.",
+                      message: `Currency successfully updated to ^b|'${report.currencyChange}'^`,
+                      handleClose: handleStatusClose,
+                      action: {
+                        callback() {
+                          handleReportPath();
+                          handleStatusClose();
+                        },
+                      },
+                    });
+                  } catch (error) {
+                    setStatus({
+                      open: true,
+                      type: "error",
+                      message:
+                        "An error occured while updating currency, please try again",
+                      handleClose: handleStatusClose,
+                      action: {
+                        callback: handleStatusClose,
+                      },
+                    });
+                    toastError(error);
+                  }
+                },
+              },
+            });
+          } else {
+            handleReportPath();
+            handleStatusClose();
+          }
+        },
+      },
+    });
+  };
+
+  const handleReportPath = () => {
+    const path: Href = "/expenses/collections";
+    if (pathname !== "/expenses/collections") {
+      router.push(path);
+    } else {
+      router.replace(path);
     }
   };
 
@@ -322,7 +399,7 @@ export const EditingContexProvider = ({
   };
 
   const open = (props: EditingContextProps) => {
-    setProps({ ...props, close, setStatus, handleStatusClose });
+    setProps({ ...props, currency, close, setStatus, handleStatusClose });
     ref.current?.snapToIndex(0);
   };
 
@@ -394,6 +471,8 @@ export const EditingContexProvider = ({
         setStatus={setStatus}
         handleStatusClose={handleStatusClose}
         handleClose={() => setAddExpenseModal(false)}
+        currency={currency}
+        handleReport={handleReport}
       />
       <SmsRequestModal
         mode={smsRequestModal}

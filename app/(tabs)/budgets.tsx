@@ -6,6 +6,7 @@ import ThemedIcon from "@/components/themedIcon";
 import { tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
+import { useCustomThemeContext } from "@/context/themeContext";
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { deleteBudgets, getBudgets } from "@/lib/budgetUtils";
 import { Budget } from "@/types/common";
@@ -22,6 +23,7 @@ import {
 import * as Progress from "react-native-progress";
 
 const Budgets = () => {
+  const { currency } = useCustomThemeContext();
   const { open, setStatus, handleStatusClose } = useEditingContext();
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -423,6 +425,7 @@ const Budgets = () => {
             <BudgetCard
               {...{
                 index,
+                currency,
                 budget: item,
                 selected: selected.has(item.id),
                 handlePress: handleItemPress,

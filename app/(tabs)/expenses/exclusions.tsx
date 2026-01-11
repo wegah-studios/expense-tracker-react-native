@@ -25,7 +25,7 @@ import {
 
 const ExclusionsPage = () => {
   const { setStatus, handleStatusClose } = useEditingContext();
-  const { collections, setCollections } = useAppProps() as {
+  const { collections, setCollections, fetchCollections } = useAppProps() as {
     collections: {
       map: Map<string, number>;
       names: string[];
@@ -38,6 +38,7 @@ const ExclusionsPage = () => {
         exclusions: string[];
       }>
     >;
+    fetchCollections: () => Promise<void>;
   };
 
   const [add, setAdd] = useState(false);
@@ -247,6 +248,7 @@ const ExclusionsPage = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
+      fetchCollections();
       router.replace({ pathname: "/expenses/exclusions" });
     }, 500);
   };

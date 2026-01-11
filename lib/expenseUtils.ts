@@ -1,5 +1,5 @@
 import db, { enqueueDB } from "@/db/db";
-import { Expense } from "@/types/common";
+import { Currency, Expense } from "@/types/common";
 import dayjs from "dayjs";
 import { nanoid } from "nanoid/non-secure";
 import { deleteReceipt } from "react-native-sms-listener";
@@ -143,7 +143,7 @@ export const deleteExpenses = async (
     map: Map<string, number>;
     names: string[];
     exclusions: string[];
-}
+  }
 ) => {
   let filtered: Partial<Expense>[] = [];
   let removed: Partial<Expense>[] = [];
@@ -181,7 +181,7 @@ export const restoreExpenses = async (
     map: Map<string, number>;
     names: string[];
     exclusions: string[];
-},
+  },
   expenses: Partial<Expense>[]
 ) => {
   let filtered: Partial<Expense>[] = [];
@@ -245,8 +245,8 @@ export const onExpenseUpdate = (
   collection: string
 ) => {
   let newExpenses: Partial<Expense>[] = [];
-  collections.map = new Map(collections.map)
-  collections.names = [...collections.names]
+  collections.map = new Map(collections.map);
+  collections.names = [...collections.names];
 
   for (let i = 0; i < expenses.length; i++) {
     const expense = expenses[i];
@@ -475,8 +475,13 @@ export const editMultipleExpenses = async (
   return map;
 };
 
-export const parseMessages = async (str: string) => {
-  let report = { complete: 0, incomplete: 0, excluded: 0 };
+export const parseMessages = async (str: string, currency: Currency) => {
+  let report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  } = { complete: 0, incomplete: 0, excluded: 0, currencyChange: null };
   let recipients: string[] = [];
   let expenses: Partial<Expense>[] = [];
 
@@ -487,31 +492,43 @@ export const parseMessages = async (str: string) => {
 
     if (/^(?=.*\d)[A-Z\d]{10}$/.test(ref)) {
       let message: string = ref + " confirmed " + messages[i + 1].slice(0, -11);
-      handleMessage(message, recipients, expenses);
+      handleMessage(message, recipients, expenses, currency, report);
     }
   }
-  await handleExpensesImport(recipients, expenses, report);
+  if (expenses.length) {
+    await handleExpensesImport(recipients, expenses, report);
+  }
   return report;
 };
 
 const handleMessage = (
   message: string,
   recipients: string[],
-  expenses: Partial<Expense>[]
+  expenses: Partial<Expense>[],
+  existingCurrency: Currency,
+  report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  }
 ) => {
   if (!/(sent to|paid to|you bought|withdraw)/i.test(message)) {
     return;
   }
 
   const ref = message.trim().substring(0, 11);
+
   message = ref + " " + normalizeString(message.slice(10));
   const recipientMatch = message.match(/to (.+?) on|from (.+?) new/i);
-  const amountMatch = message.match(/ksh(\d{1,3}(,\d{3})*(\.\d{2})?)/i);
   const transactionCostMatch = message.match(
-    /transaction cost, ksh(\d{1,3}(,\d{3})*(\.\d{2})?)/i
+    /transaction cost, (KSh|TSh|MT|FC|GH₵|LE|Br)(\d{1,3}(,\d{3})*(\.\d{2})?)/i
   );
   const airtimeMatch = message.match(
-    /you bought ksh\d{1,3}(,\d{3})*(\.\d{2})? of airtime/i
+    /you bought (KSh|TSh|MT|FC|GH₵|LE|Br)\d{1,3}(,\d{3})*(\.\d{2})? of airtime/i
+  );
+  const amountMatch = message.match(
+    /(KSh|TSh|MT|FC|GH₵|LE|Br)(\d{1,3}(,\d{3})*(\.\d{2})?)/i
   );
   const dateMatch = message.match(/on (\d{1,2}\/\d{1,2}\/\d{2,4})/);
   const timeMatch = message.match(/at (\d{1,2}:\d{2} (?:am|pm))/i);
@@ -522,8 +539,8 @@ const handleMessage = (
     (airtimeMatch ? "safaricom" : undefined);
 
   const amount: number | undefined =
-    Number(amountMatch?.[1].replace(/,/g, "")) +
-      Number(transactionCostMatch?.[1].replace(/,/g, "") || 0) || undefined;
+    Number(amountMatch?.[2].replace(/,/g, "")) +
+      Number(transactionCostMatch?.[2].replace(/,/g, "") || 0) || undefined;
 
   let date = dateMatch?.[1] || null;
   let time = timeMatch?.[1] || null;
@@ -559,10 +576,25 @@ const handleMessage = (
     }
   }
 
+  let currency = amountMatch?.[1]?.trim();
+  if (currency) {
+    let space = 2;
+    if (currency === "br") {
+      space = 1;
+    }
+    currency = currency.slice(0, space).toUpperCase() + currency.slice(space);
+    if (currency !== existingCurrency) {
+      report.currencyChange = currency as Currency;
+    }
+  } else {
+    currency = "KSh";
+  }
+
   let expense: Partial<Expense> = {
     ref,
     amount,
     recipient,
+    currency,
     date: dateTime,
     receipt: message,
   };
@@ -591,7 +623,7 @@ const getExpenseLabel = (
   return label;
 };
 
-export const parsePdfText = async (text: string) => {
+export const parsePdfText = async (text: string, currency: Currency) => {
   const receipts = text.match(
     /\b(?=[A-Z0-9]{10}\b)(?=.*[A-Z])(?=.*\d)[A-Z0-9]{10}\b(\s+|\n+|\s+\n+|\n+\s+)\b\d{4}-\d{2}-\d{2}(\s+|\n+|\s+\n+|\n+\s+)\d{2}:\d{2}:\d{2}\b([\s\S]*?)completed(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)(.+?)(\s+|\n+|\s+\n+|\n+\s+)/gi
   );
@@ -600,7 +632,12 @@ export const parsePdfText = async (text: string) => {
   let record: Record<string, { index: number; isTransactionCost: boolean }> =
     {};
 
-  let report = { complete: 0, incomplete: 0, excluded: 0 };
+  let report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  } = { complete: 0, incomplete: 0, excluded: 0, currencyChange: null };
   let recipients: string[] = [];
 
   if (!receipts || !receipts.length) {
@@ -608,16 +645,17 @@ export const parsePdfText = async (text: string) => {
   }
 
   for (let receipt of receipts) {
-    handlePdfReceipt(receipt, expenses, recipients, record);
+    handlePdfReceipt(receipt, currency, expenses, recipients, record);
   }
-  await handleExpensesImport(recipients, expenses, report);
+  if (expenses.length) {
+    await handleExpensesImport(recipients, expenses, report);
+  }
 
   return report;
 };
 
 const getImportInfo = (expense: Partial<Expense>, recipients: string[]) => {
   expense.id = nanoid();
-  expense.currency = "Ksh";
   if (expense.recipient) {
     recipients.push(expense.recipient);
   }
@@ -637,6 +675,13 @@ const getDictionary = async (recipients: string[]) => {
       recipient
     )} LIKE '%' || match || '%'`;
   }
+
+  query += ` ORDER BY
+  CASE type
+    WHEN 'keyword' THEN 0
+    WHEN 'recipient' THEN 1
+    ELSE 2
+  END;`;
 
   const data: { match: string; label: string }[] = await db.getAllAsync(query);
   return data.reduce((obj, { match, label }) => {
@@ -692,6 +737,7 @@ const handleExpensesImport = async (
 
 const handlePdfReceipt = (
   receipt: string,
+  currency: Currency,
   expenses: Partial<Expense>[],
   recipients: string[],
   record: Record<
@@ -749,12 +795,12 @@ const handlePdfReceipt = (
     const expense = expenses[record[ref].index];
 
     if (record[ref].isTransactionCost) {
-      expense.receipt = `${details}, transaction cost: Ksh ${(
+      expense.receipt = `${details}, transaction cost: ${currency} ${(
         expense.amount || 0
       ).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
       expense.recipient = recipient;
     } else if (isTransactionCost) {
-      expense.receipt += `, transaction cost: Ksh ${amount.toLocaleString(
+      expense.receipt += `, transaction cost: ${currency} ${amount.toLocaleString(
         undefined,
         { maximumFractionDigits: 2 }
       )}`;
@@ -768,6 +814,7 @@ const handlePdfReceipt = (
       date,
       amount,
       recipient,
+      currency,
       receipt: details,
     };
     getImportInfo(expense, recipients);
@@ -775,70 +822,103 @@ const handlePdfReceipt = (
   }
 };
 
-export const parseExcelFile = async (b64: string) => {
-  let report = { complete: 0, incomplete: 0, excluded: 0 };
+export const parseExcelFile = async (b64: string, currency: string) => {
+  let report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  } = { complete: 0, incomplete: 0, excluded: 0, currencyChange: null };
   let recipients: string[] = [];
   let expenses: Partial<Expense>[] = [];
 
-  await db.withTransactionAsync(async () => {
-    const wb = XLSX.read(b64, { type: "base64" });
+  const wb = XLSX.read(b64, { type: "base64" });
 
-    for (let name of wb.SheetNames) {
-      const ws = wb.Sheets[name];
-      const data: Partial<Expense>[] = XLSX.utils.sheet_to_json(ws);
-      for (let item of data) {
-        const expense: Partial<Expense> = {};
-        if (item.label) {
-          expense.label = String(item.label);
-        }
-        if (item.recipient) {
-          expense.recipient = String(item.recipient);
-        }
-        if (item.amount && Number(item.amount)) {
-          expense.amount = Number(item.amount);
-        }
-        if (item.ref) {
-          expense.ref = String(item.ref);
-        }
-        if (item.receipt) {
-          expense.receipt = String(item.receipt);
-        }
-        if (item.date) {
-          const date = new Date(item.date);
-          if (!isNaN(date.getTime())) {
-            expense.date = date.toISOString();
-          }
-        }
-
-        if (Object.keys(expense).length) {
-          getImportInfo(expense, recipients);
-          expenses.push(expense);
+  for (let name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    const data: Partial<Expense>[] = XLSX.utils.sheet_to_json(ws);
+    for (let item of data) {
+      const expense: Partial<Expense> = {};
+      if (item.label) {
+        expense.label = String(item.label);
+      }
+      if (item.recipient) {
+        expense.recipient = String(item.recipient);
+      }
+      if (item.amount && Number(item.amount)) {
+        expense.amount = Number(item.amount);
+      }
+      if (item.ref) {
+        expense.ref = String(item.ref);
+      }
+      if (item.receipt) {
+        expense.receipt = String(item.receipt);
+      }
+      if (item.date) {
+        const date = new Date(item.date);
+        if (!isNaN(date.getTime())) {
+          expense.date = date.toISOString();
         }
       }
+      if (
+        item.currency &&
+        /(KSh|TSh|MT|FC|GH₵|LE|Br)/.test(String(item.currency))
+      ) {
+        if (item.currency !== currency) {
+          report.currencyChange = item.currency as Currency;
+        }
+        expense.currency = item.currency;
+      } else {
+        expense.currency = currency;
+      }
+
+      if (Object.keys(expense).length) {
+        getImportInfo(expense, recipients);
+        expenses.push(expense);
+      }
     }
-  });
-  await handleExpensesImport(recipients, expenses, report);
+  }
+  if (expenses.length) {
+    await handleExpensesImport(recipients, expenses, report);
+  }
   return report;
 };
 
-export const importFromSMSListener = async (messages: string[]) => {
-  let report = { complete: 0, incomplete: 0, excluded: 0 };
+export const importFromSMSListener = async (
+  messages: string[],
+  currency: Currency
+) => {
+  let report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  } = { complete: 0, incomplete: 0, excluded: 0, currencyChange: null };
   let recipients: string[] = [];
   let expenses: Partial<Expense>[] = [];
 
   for (let message of messages) {
-    handleMessage(message, recipients, expenses);
+    handleMessage(message, recipients, expenses, currency, report);
   }
-  await handleExpensesImport(recipients, expenses, report);
+  if (expenses.length) {
+    await handleExpensesImport(recipients, expenses, report);
+  }
   return report;
 };
 
-export const handleSmsEvent = async (message: { id: number; body: string }) => {
-  let report = { complete: 0, incomplete: 0, excluded: 0 };
+export const handleSmsEvent = async (
+  message: { id: number; body: string },
+  currency: Currency
+) => {
+  let report: {
+    complete: number;
+    incomplete: number;
+    excluded: number;
+    currencyChange: Currency | null;
+  } = { complete: 0, incomplete: 0, excluded: 0, currencyChange: null };
   let recipients: string[] = [];
   let expenses: Partial<Expense>[] = [];
-
-  handleMessage(message.body, recipients, expenses);
+  handleMessage(message.body, recipients, expenses, currency, report);
   await handleExpensesImport(recipients, expenses, report);
   await deleteReceipt(message.id);
   return report;

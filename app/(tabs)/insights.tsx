@@ -5,6 +5,7 @@ import ThemedIcon from "@/components/themedIcon";
 import { colorCycle, tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { useEditingContext } from "@/context/editingContext";
+import { useCustomThemeContext } from "@/context/themeContext";
 import { formatAmount } from "@/lib/appUtils";
 import {
   fetchInsightLabels,
@@ -32,6 +33,7 @@ const InsightsPage = () => {
     initialPath?: string;
     initialOptions?: string;
   };
+  const { currency } = useCustomThemeContext();
   const { setAddExpenseModal } = useEditingContext();
 
   const [loading, setLoading] = useState<{
@@ -142,7 +144,8 @@ const InsightsPage = () => {
           record.set(pathstring, insight as Insight);
           insight.trends = await fetchInsightTrends(
             insight as Insight,
-            storedOptions
+            storedOptions,
+            currency
           );
           setRecord((prev) => {
             const newMap = new Map(prev);
@@ -407,7 +410,7 @@ const InsightsPage = () => {
                       toggleOnDark={false}
                       className=" text-[2rem] font-urbanistBold "
                     >
-                      - Ksh {formatAmount(focusPath.total, 1000000)}
+                      - {currency} {formatAmount(focusPath.total, 1000000)}
                     </ThemedText>
                     {!!focusPath.trends.length && (
                       <View className=" flex-row gap-2 justify-between items-center flex-wrap ">

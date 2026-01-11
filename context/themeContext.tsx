@@ -3,7 +3,7 @@ import { addLog, toastError } from "@/lib/appUtils";
 import { updateExpiredBudgets } from "@/lib/budgetUtils";
 import { startSMSCapture } from "@/lib/smsUtils";
 import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
-import { Theme } from "@/types/common";
+import { Currency, Theme } from "@/types/common";
 import * as SplashScreen from "expo-splash-screen";
 import { colorScheme } from "nativewind";
 import React, {
@@ -20,6 +20,8 @@ const CustomThemeContext = createContext<{
   theme: Theme;
   toggleTheme: () => void;
   isRated: boolean;
+  currency: Currency;
+  setCurrency: React.Dispatch<React.SetStateAction<Currency>>;
   smsCaptureState: "on" | "off" | "dnd" | null;
   updateSmsCaptureState: (state: "on" | "off" | "dnd") => Promise<void>;
   pinProtected: boolean;
@@ -46,6 +48,7 @@ export const CustomThemeContextProvider = ({
   const [smsCaptureState, setSmsCaptureState] = useState<
     "on" | "off" | "dnd" | null
   >(null);
+  const [currency, setCurrency] = useState<Currency>("KSh");
   const [isRated, setIsRated] = useState<boolean>(false);
   const [pinProtected, setPinProtected] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
@@ -54,16 +57,23 @@ export const CustomThemeContextProvider = ({
     try {
       const startup = async () => {
         if (!mounted) {
+          addLog({ type: "info", content: "Starting up..." });
           console.log("starting up");
           //init db
           await initDB();
           //startup
           const [storage, isCapture] = await Promise.all([
-            getStoreItems("smsCapture", "rated", "theme", "hash"),
+            getStoreItems("smsCapture", "rated", "theme", "hash", "currency"),
             isCaptureActive(),
           ]);
 
           await updateExpiredBudgets();
+
+          if (storage.currency) {
+            setCurrency(storage.currency as Currency);
+          } else {
+            await setStoreItems([["currency", "KSh"]]);
+          }
 
           if (storage.theme) {
             colorScheme.set(storage.theme as Theme);
@@ -143,6 +153,8 @@ export const CustomThemeContextProvider = ({
           toggleTheme,
           isRated,
           smsCaptureState,
+          currency,
+          setCurrency,
           updateSmsCaptureState,
           pinProtected,
           setPinProtected,

@@ -2,7 +2,7 @@ import icons from "@/constants/icons";
 import { toastError } from "@/lib/appUtils";
 import { pasteFromClipboard } from "@/lib/clipboardUtils";
 import { parseMessages } from "@/lib/expenseUtils";
-import { Status } from "@/types/common";
+import { Currency, Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import React, { useState } from "react";
 import { Dimensions, Keyboard, Pressable, View } from "react-native";
@@ -11,16 +11,19 @@ import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 
 const Messages = (props: Record<string, any>) => {
-  const { handleUpdate, close, setStatus, handleStatusClose } = props as {
-    handleUpdate: (report: {
-      complete: number;
-      incomplete: number;
-      excluded: number;
-    }) => void;
-    close: () => void;
-    setStatus: React.Dispatch<React.SetStateAction<Status>>;
-    handleStatusClose: () => void;
-  };
+  const { currency, handleUpdate, close, setStatus, handleStatusClose } =
+    props as {
+      currency: Currency;
+      handleUpdate: (report: {
+        complete: number;
+        incomplete: number;
+        excluded: number;
+        currencyChange: Currency | null;
+      }) => void;
+      close: () => void;
+      setStatus: React.Dispatch<React.SetStateAction<Status>>;
+      handleStatusClose: () => void;
+    };
 
   const [receipt, setReceipt] = useState<string>("");
 
@@ -52,7 +55,7 @@ const Messages = (props: Record<string, any>) => {
       action: { callback() {} },
     });
     try {
-      const report = await parseMessages(receipt);
+      const report = await parseMessages(receipt, currency);
       handleUpdate(report);
       close();
     } catch (error) {

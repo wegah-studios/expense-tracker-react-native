@@ -1,16 +1,15 @@
-import { tintColors } from "@/constants/colorSettings";
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { getSuggestions } from "@/lib/dictionaryUtils";
-import React, { useEffect, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import LabelChip from "./expenses/labelChip";
+import InputField from "./inputField";
 import ThemedText from "./textThemed";
 
 const LabelInput = ({
-  expenseValue,
+  name,
   value,
-  input,
   required = true,
   showBorder = true,
   changed,
@@ -18,42 +17,45 @@ const LabelInput = ({
   error,
   disabled,
   helperText,
-  placeholderText,
-  setErrors,
-  setTouched,
-  setChanges,
-  setForm,
-  setInput,
-  handleInputFocus,
+  placeHolder,
+  handleChange,
+  handleBlur,
+  handleFocus,
 }: {
   showBorder?: boolean;
   required?: boolean;
-  expenseValue: string | undefined;
-  value: string[] | undefined;
-  input: string;
-  changed: boolean;
-  touched: boolean;
-  error: string;
-  disabled?: boolean;
+  value: string;
+  name?: string;
+  placeHolder?: string;
   helperText?: string;
-  placeholderText?: string;
-  setErrors: any;
-  setChanges: any;
-  setTouched: any;
-  setForm: any;
-  setInput: React.Dispatch<React.SetStateAction<string>>;
-  handleInputFocus?: (scrollY: number) => void;
+  error?: string;
+  touched?: boolean;
+  changed?: boolean;
+  disabled?: boolean;
+  handleChange: (name: string, value: string) => void;
+  handleBlur: (name: string) => void;
+  handleFocus?: (name: string) => void;
 }) => {
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [editMode, setEditMode] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+  const inputName = useMemo(() => name || "label", [name]);
+  const label = useMemo(
+    () =>
+      !!value
+        ? normalizeString(value)
+            .replace(/\s*,\s*/g, ",")
+            .split(",")
+        : [],
+    [value]
+  );
 
   useEffect(() => {
     setFilteredSuggestions(
-      suggestions.filter((str) => str.includes(normalizeString(input || "")))
+      suggestions.filter((str) => str.includes(normalizeString(value || "")))
     );
-  }, [input, suggestions]);
+  }, [value, suggestions]);
 
   useEffect(() => {
     try {
@@ -73,77 +75,32 @@ const LabelInput = ({
     }
   };
 
-  const handleblur = () => {
-    setEditMode(false);
-    if (!touched) {
-      setTouched((prev: any) => {
-        const newSet = new Set(prev);
-        newSet.add("label");
-        return newSet;
-      });
-    }
-  };
-
   const handleLabelCancel = (index: number) => {
-    if (value) {
-      let labels = value.filter((_str, i) => i !== index);
-      let newInput = labels.join(", ");
-      setInput(newInput);
-      setSelection({ start: newInput.length, end: newInput.length });
-      handleUpdate(labels as string[]);
-    }
+    const filtered = label.filter((_str, i) => i !== index);
+    let newValue = filtered.join(", ");
+    setSelection({ start: newValue.length, end: newValue.length });
+    handleChange(inputName, newValue);
   };
 
   const handleSuggestionPress = (suggestion: string) => {
-    const newValue = suggestion.split(",");
-    handleUpdate(newValue as string[]);
-    setInput(suggestion);
+    handleChange(inputName, suggestion);
     setSelection({ start: suggestion.length, end: suggestion.length });
   };
 
-  const handleChange = (text: string) => {
-    setInput(text);
-    handleUpdate(text.split(/,|-|\//));
+  const onChange = (name: string, value: string) => {
+    if (!editMode) {
+      setEditMode(true);
+    }
+    handleChange(name, value);
   };
 
-  const handleUpdate = (update: string[]) => {
-    let normalizedArr: string[] = [];
-
-    for (let str of update) {
-      const normalized = normalizeString(str);
-      if (normalized) {
-        normalizedArr.push(normalized);
-      }
-    }
-
-    setForm((prev: Record<string, any>) => ({ ...prev, label: normalizedArr }));
-    const isDiff = normalizedArr.join(",") !== (expenseValue || "");
-    setChanges((prev: Set<string>) => {
-      if (isDiff !== prev.has("label")) {
-        const newSet = new Set(prev);
-        if (isDiff) {
-          newSet.add("label");
-        } else {
-          newSet.delete("label");
-        }
-        return newSet;
-      }
-      return prev;
-    });
-    if (required) {
-      setErrors((prev: Record<string, any>) => {
-        if (normalizedArr.length) {
-          if (prev.label === "required") {
-            return { ...prev, label: "" };
-          }
-        } else {
-          if (prev.label !== "required") {
-            return { ...prev, label: "required" };
-          }
-        }
-        return prev;
-      });
-    }
+  const onFocus = () => {
+    setEditMode(true);
+    handleFocus && handleFocus(inputName);
+  };
+  const onBlur = () => {
+    setEditMode(false);
+    handleBlur(inputName);
   };
 
   return (
@@ -152,69 +109,46 @@ const LabelInput = ({
         showBorder ? "p-[20px] border border-divider" : ""
       } `}
     >
-      <ThemedText className=" font-urbanistMedium text-[1.2rem] ">
-        Label
-      </ThemedText>
-      <View className=" flex-col gap-[5px] ">
+      {editMode || !label.length ? (
+        <InputField
+          autoFocus={!!label.length}
+          editable={!disabled}
+          required={required}
+          name={inputName}
+          placeholder={placeHolder || "Enter label"}
+          value={value}
+          error={error}
+          touched={touched}
+          changed={changed}
+          helperText={helperText || `Separate Labels with commas ,`}
+          handleChange={onChange}
+          handleFocus={onFocus}
+          handleBlur={onBlur}
+          // selection={selection}
+          // onSelectionChange={({ nativeEvent }) => {
+          //   setSelection(nativeEvent.selection);
+          // }}
+        />
+      ) : (
         <Pressable
           disabled={!!disabled}
           onPress={handlePress}
-          className={` flex-row p-[10px] rounded-[10px] border ${
-            touched && error
-              ? "border-error"
-              : changed
-              ? "border-info"
-              : input
-              ? "border-black dark:border-white"
-              : "border-divider"
-          } `}
+          className={` flex-row p-[10px] rounded-[10px] border dark:border-white `}
         >
-          {!value?.length && !editMode && (
-            <ThemedText toggleOnDark={false} className=" text-divider ">
-              {placeholderText || "e.g. Transport, Uber"}
-            </ThemedText>
-          )}
-          {editMode ? (
-            <TextInput
-              autoFocus
-              placeholder={placeholderText || "Enter label"}
-              value={input}
-              onChangeText={handleChange}
-              onFocus={() => handleInputFocus && handleInputFocus(0)}
-              onBlur={handleblur}
-              placeholderTextColor={tintColors.divider}
-              className=" p-[0px] min-w-[100px] dark:color-white "
-              selection={selection}
-              onSelectionChange={({ nativeEvent }) => {
-                setSelection(nativeEvent.selection);
-              }}
-            />
-          ) : (
-            <View className=" flex-row gap-[10px] flex-wrap items-center ">
-              {value?.map((item, index) => (
-                <LabelChip
-                  key={index}
-                  disabled={!!disabled}
-                  name={item}
-                  index={index}
-                  onPress={handlePress}
-                  onCancel={handleLabelCancel}
-                />
-              ))}
-            </View>
-          )}
+          <View className=" flex-row gap-[10px] flex-wrap items-center ">
+            {label.map((item, index) => (
+              <LabelChip
+                key={index}
+                disabled={!!disabled}
+                name={item}
+                index={index}
+                onPress={handlePress}
+                onCancel={handleLabelCancel}
+              />
+            ))}
+          </View>
         </Pressable>
-        <ThemedText
-          toggleOnDark={false}
-          className={` ml-[5px] ${
-            touched && !!error ? " text-error" : " text-divider"
-          } `}
-        >
-          {touched && !!error
-            ? "label " + error
-            : helperText || `Separate Labels with commas ,`}
-        </ThemedText>
-      </View>
+      )}
       {editMode && !!filteredSuggestions.length && (
         <View className=" flex-col gap-[10px] ">
           <ThemedText toggleOnDark={false} className=" text-divider ">

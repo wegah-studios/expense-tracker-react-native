@@ -100,10 +100,11 @@ export const schema = `
       key TEXT PRIMARY KEY,
       value TEXT
       );
+      INSERT OR IGNORE INTO store (key, value) VALUES ("currency", "KSh");
       `;
 
 export const initDB = async () => {
   await db.execAsync(schema);
 };
 
-export default db as SQLiteDatabase
+export default db as SQLiteDatabase;

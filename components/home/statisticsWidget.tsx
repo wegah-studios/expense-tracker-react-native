@@ -20,8 +20,10 @@ import StatisticsOption from "../insights/statisticsOption";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
 import HomeBudgetWidget from "./budgetWidget";
+import { useCustomThemeContext } from "@/context/themeContext";
 
 const HomeStatisticsWidget = () => {
+  const {currency} = useCustomThemeContext()
   const { setAddExpenseModal } = useEditingContext();
   const scopes = useMemo<HomeScope[]>(() => getHomeInsightScopes(), []);
   const [options, setOptions] = useState<Map<string, StatisticOption[]>>(
@@ -69,7 +71,7 @@ const HomeStatisticsWidget = () => {
         insight.value = value;
 
         let [trends, labels] = await Promise.all([
-          fetchInsightTrends(insight as Insight, updatedOptions),
+          fetchInsightTrends(insight as Insight, updatedOptions, currency),
           getHomeInsightLabels(scopeData.path),
         ]);
         insight.trends = trends;
@@ -196,7 +198,7 @@ const HomeStatisticsWidget = () => {
               toggleOnDark={false}
               className=" text-[2rem] font-urbanistBold "
             >
-              - Ksh {formatAmount(data.total, 1000000)}
+              -{currency} {formatAmount(data.total, 1000000)}
             </ThemedText>
             {!!data.trends.length && (
               <View className=" flex-row gap-2 justify-between items-center flex-wrap ">
@@ -231,7 +233,7 @@ const HomeStatisticsWidget = () => {
           </View>
         </ScrollView>
       </View>
-      <HomeBudgetWidget scope={scope} />
+      <HomeBudgetWidget scope={scope} currency={currency} />
       {!!data?.labels.length && (
         <ThemedText className=" capitalize font-urbanistMedium text-[1.2rem] ">
           {data.title}'s expenses
@@ -243,6 +245,7 @@ const HomeStatisticsWidget = () => {
             key={index}
             index={index}
             {...label}
+            currency={currency}
             percent={label.total / data.total}
             onPress={handleLabelPress}
           />

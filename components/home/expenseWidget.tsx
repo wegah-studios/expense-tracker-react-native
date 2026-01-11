@@ -10,8 +10,10 @@ import { Image, Pressable, View } from "react-native";
 import ExpenseCard from "../expenses/expenseCard";
 import ThemedText from "../textThemed";
 import ThemedIcon from "../themedIcon";
+import { useCustomThemeContext } from "@/context/themeContext";
 
 const HomeExpenseWidget = () => {
+  const {currency} = useCustomThemeContext()
   const { open } = useEditingContext();
   const [expenses, setExpenses] = useState<Partial<Expense>[]>([]);
 
@@ -77,6 +79,7 @@ const HomeExpenseWidget = () => {
                 index={index}
                 expense={expense}
                 handlePress={handleEdit}
+                currency={currency}
               />
             ))}
           </View>

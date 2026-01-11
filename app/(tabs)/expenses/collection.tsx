@@ -35,14 +35,15 @@ import {
 import * as Progress from "react-native-progress";
 
 const Collection = () => {
-  const { theme } = useCustomThemeContext();
+  const { theme, currency } = useCustomThemeContext();
+
   const { collection, filter, exclusion } = useLocalSearchParams() as {
     collection?: string;
     filter?: string;
     exclusion?: string;
   };
 
-  const { collections, setCollections } = useAppProps() as {
+  const { collections, setCollections, fetchCollections } = useAppProps() as {
     loading: boolean;
     collections: {
       map: Map<string, number>;
@@ -55,6 +56,7 @@ const Collection = () => {
         names: string[];
       }>
     >;
+    fetchCollections: () => Promise<void>;
   };
   const { open, setStatus, handleStatusClose } = useEditingContext();
 
@@ -413,6 +415,7 @@ const Collection = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
+      fetchCollections();
       router.replace({
         pathname: "/expenses/collection",
         params: { collection, filter, exclusion },
@@ -552,6 +555,7 @@ const Collection = () => {
                 <ExpenseCard
                   {...{
                     index: item,
+                    currency,
                     sectionId: section.id,
                     expense: expenses[item],
                     selected: selected.has(item),

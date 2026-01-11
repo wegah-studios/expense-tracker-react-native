@@ -1,7 +1,7 @@
 import { colorCycle, tintColors } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { formatAmount } from "@/lib/appUtils";
-import { Budget } from "@/types/common";
+import { Budget, Currency } from "@/types/common";
 import dayjs from "dayjs";
 import React, { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
@@ -13,6 +13,7 @@ const BudgetCard = React.memo(
   ({
     index,
     budget,
+    currency,
     selected = false,
     handlePress,
     handleLongPress,
@@ -20,6 +21,7 @@ const BudgetCard = React.memo(
     index: number;
     budget: Budget;
     selected?: boolean;
+    currency: Currency;
     handlePress?: (id: string, index: number) => void;
     handleLongPress?: (id: string, index: number) => void;
   }) => {
@@ -158,7 +160,7 @@ const BudgetCard = React.memo(
               style={{ color: expired ? tintColors.divider : percentColor }}
               className=" font-urbanistMedium text-[1.5rem] "
             >
-              -Ksh {formatAmount(budget.current, 10000)}
+              -{currency} {formatAmount(budget.current, 10000)}
             </ThemedText>
           </View>
           <View className=" flex-1 flex-row justify-end ">
@@ -181,7 +183,7 @@ const BudgetCard = React.memo(
                 }}
                 className=" font-urbanistMedium text-[1.5rem] "
               >
-                Ksh {formatAmount(budget.total, 10000)}
+                {currency} {formatAmount(budget.total, 10000)}
               </ThemedText>
             </View>
           </View>

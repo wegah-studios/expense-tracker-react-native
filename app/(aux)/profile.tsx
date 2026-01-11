@@ -10,6 +10,8 @@ import { factoryReset, toastError } from "@/lib/appUtils";
 import { exportData, importData } from "@/lib/exportUtils";
 import { removePin } from "@/lib/pinUtils";
 import { getStoreItems, setStoreItems } from "@/lib/storeUtils";
+import { Currency } from "@/types/common";
+import { MenuView, NativeActionEvent } from "@react-native-menu/menu";
 import { nativeApplicationVersion } from "expo-application";
 import { Link, router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
@@ -34,12 +36,26 @@ const Profile = () => {
   const {
     theme,
     toggleTheme,
+    currency,
+    setCurrency,
     smsCaptureState,
     updateSmsCaptureState,
     pinProtected,
     setPinProtected,
   } = useCustomThemeContext();
 
+  const currencies = useMemo(
+    () => [
+      { name: "Kenyan Shilling", value: "KSh" },
+      { name: "Tanzanian Shilling", value: "TSh" },
+      { name: "Ethiopian Birr", value: "Br" },
+      { name: "Mozambican Metical", value: "MT" },
+      { name: "Congolese Franc", value: "FC" },
+      { name: "Ghanaian Cedi", value: "GH₵" },
+      { name: "Egyptian Pound", value: "LE" },
+    ],
+    []
+  );
   const isDarkTheme = useMemo(() => theme === "dark", [theme]);
   const version = useMemo(() => nativeApplicationVersion, []);
   const [showFab, setShowFab] = useState<boolean>(false);
@@ -419,6 +435,46 @@ const Profile = () => {
     });
   };
 
+  const changeCurrency = async ({ nativeEvent }: NativeActionEvent) => {
+    try {
+      setStatus({
+        open: true,
+        type: "loading",
+        message: "Updating currency",
+        handleClose: handleStatusClose,
+        action: {
+          callback() {
+            handleStatusClose();
+          },
+        },
+      });
+      await setStoreItems([["currency", nativeEvent.event]]);
+      setCurrency(nativeEvent.event as Currency);
+      setStatus({
+        open: true,
+        type: "success",
+        title: "Currency updated",
+        message: `Currency successfully updated to '${nativeEvent.event}'`,
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+    } catch (error) {
+      setStatus({
+        open: true,
+        type: "error",
+        title: "Updating currency failed",
+        message: "An error occured while updating currency, please try again.",
+        handleClose: handleStatusClose,
+        action: {
+          callback: handleStatusClose,
+        },
+      });
+      toastError(error);
+    }
+  };
+
   const handleLink = async () => {
     await openBrowserAsync("https://qwantu.wegahstudios.com/");
   };
@@ -558,6 +614,43 @@ const Profile = () => {
                     />
                     <ThemedText>On</ThemedText>
                   </View>
+                </View>
+              </View>
+            </View>
+            <View className=" flex-col gap-[10px] ">
+              <ThemedText className=" font-urbanistBold text-[1.2rem] ">
+                Locale
+              </ThemedText>
+              <View className=" flex-col gap-[20px] p-[20px] bg-paper-light rounded-[20px] dark:bg-paper-dark ">
+                <View className=" flex-row justify-between items-center ">
+                  <ThemedText className=" text-[1.1rem] font-urbanistMedium ">
+                    Currency
+                  </ThemedText>
+                  <MenuView
+                    title="Options"
+                    onPressAction={changeCurrency}
+                    actions={currencies.map(({ name, value }) => ({
+                      id: value,
+                      title: `${name} (${value})`,
+                      subtitle: name,
+                      imageColor:
+                        tintColors[theme === "dark" ? "light" : "dark"],
+                      state: currency === value ? "on" : "off",
+                    }))}
+                    shouldOpenOnLongPress={false}
+                  >
+                    <View
+                      className={` pl-[5px] pr-[5px] flex-row gap-2 items-center`}
+                    >
+                      <ThemedText className=" text-[1.2rem] font-urbanistBold ">
+                        {currency}
+                      </ThemedText>
+                      <ThemedIcon
+                        source={icons.chevron}
+                        className=" w-[10px] h-[10px]  "
+                      />
+                    </View>
+                  </MenuView>
                 </View>
               </View>
             </View>

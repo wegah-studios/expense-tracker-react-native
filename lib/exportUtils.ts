@@ -1,5 +1,5 @@
 import db, { DB_INTEGRITY } from "@/db/db";
-import { Expense, ManifestEntry } from "@/types/common";
+import { Currency, Expense, ManifestEntry } from "@/types/common";
 import CryptoJS from "crypto-js";
 import dayjs from "dayjs";
 import * as DocumentPicker from "expo-document-picker";
@@ -329,7 +329,7 @@ export const selectExpensesImport = async () => {
   return { name, uri };
 };
 
-export const importExpenses = async (uri: string) => {
+export const importExpenses = async (uri: string, currency: Currency) => {
   if (!dirExists(uri)) {
     throw new Error(`File doesn't exist`, { cause: 1 });
   }
@@ -338,7 +338,7 @@ export const importExpenses = async (uri: string) => {
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  return await parseExcelFile(b64);
+  return await parseExcelFile(b64, currency);
 };
 
 export const selectStatementImport = async () => {
@@ -353,14 +353,14 @@ export const selectStatementImport = async () => {
   return { name, uri };
 };
 
-export const importStatement = async (uri: string) => {
+export const importStatement = async (uri: string, currency: Currency) => {
   const info = await FileSystem.getInfoAsync(uri);
   if (!info.exists) {
     throw new Error(`File doesn't exist`, { cause: 1 });
   }
 
   const pdfText = await ReactNativePdfTextExtractor.extractTextFromPdf(uri);
-  return await parsePdfText(pdfText);
+  return await parsePdfText(pdfText, currency);
 };
 
 export const dirExists = async (uri: string) => {

@@ -1,6 +1,7 @@
 import { colorCycle } from "@/constants/colorSettings";
 import icons from "@/constants/icons";
 import { formatAmount } from "@/lib/appUtils";
+import { Currency } from "@/types/common";
 import React from "react";
 import { Pressable, View } from "react-native";
 import * as Progress from "react-native-progress";
@@ -12,12 +13,14 @@ const LabelCard = ({
   value,
   percent,
   total,
+  currency,
   onPress,
 }: {
   index: number;
   percent: number;
   value: string;
   total: number;
+  currency: Currency;
   onPress: (value: string) => void;
 }) => {
   return (
@@ -73,7 +76,7 @@ const LabelCard = ({
         toggleOnDark={false}
         className=" font-urbanistBold text-[1.5rem]"
       >
-        -Ksh {formatAmount(total, 10000)}
+        -{currency} {formatAmount(total, 10000)}
       </ThemedText>
     </Pressable>
   );

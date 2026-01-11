@@ -59,7 +59,10 @@ const ImportFileModal = ({
         handleClose: handleStatusClose,
         action: {
           title: "Leave",
-          callback: handleClose,
+          callback() {
+            handleStatusClose();
+            handleClose();
+          },
         },
       });
     } else {

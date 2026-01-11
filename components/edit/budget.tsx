@@ -4,7 +4,7 @@ import { useCustomThemeContext } from "@/context/themeContext";
 import { normalizeString, toastError } from "@/lib/appUtils";
 import { updateBudgets } from "@/lib/budgetUtils";
 import validateInput from "@/lib/validateInput";
-import { Budget, Status } from "@/types/common";
+import { Budget, Currency, Status } from "@/types/common";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -30,12 +30,14 @@ const EditBudget = (props: Record<string, any>) => {
     index,
     mode,
     budget,
+    currency,
     handleUpdate,
     close,
     setStatus,
     handleStatusClose,
   } = props as {
     mode: "add" | "edit";
+    currency:Currency;
     index?: number;
     budget: Partial<Budget>;
     handleUpdate?: (update: Partial<Budget>, index: number) => void;
@@ -46,22 +48,21 @@ const EditBudget = (props: Record<string, any>) => {
 
   const [form, setForm] = useState<{
     total: string;
-    label: string[] | undefined;
+    label: string;
     start: Date;
     end: Date;
-    repeat: boolean;
+    repeat: 1 | 0;
     title: string;
     duration: "year" | "month" | "week" | "custom";
   }>({
-    label: [],
+    label: "",
     total: "",
-    repeat: true,
+    repeat: 1,
     title: "this year",
     duration: "year",
     end: new Date(Date.UTC(new Date().getFullYear(), 11, 32)),
     start: new Date(Date.UTC(new Date().getFullYear(), 0, 1)),
   });
-  const [labelInput, setLabelInput] = useState<string>("");
   const [errors, setErrors] = useState<{
     label: string;
     total: string;
@@ -87,7 +88,7 @@ const EditBudget = (props: Record<string, any>) => {
         !budget.end &&
         !budget.title &&
         !budget.duration &&
-        !budget.repeat &&
+        budget.repeat === undefined &&
         changes.size < 6),
     [changes, budget]
   );
@@ -117,15 +118,15 @@ const EditBudget = (props: Record<string, any>) => {
 
   useEffect(() => {
     setForm((prev) => ({
-      label: budget.label ? budget.label.split(",") : undefined,
+      label: budget.label ? budget.label : "",
       total: budget.total ? String(budget.total) : "",
       start: budget.start ? new Date(budget.start) : prev.start,
       end: budget.end ? new Date(budget.end) : prev.end,
       title: budget.title || prev.title,
       duration: budget.duration || prev.duration,
-      repeat: budget.repeat !== undefined ? !!budget.repeat : prev.repeat,
+      repeat: budget.repeat !== undefined ? budget.repeat : prev.repeat,
     }));
-    setLabelInput(budget.label?.replaceAll(",", ", ") || "");
+
     setErrors({
       label: "",
       title: "",
@@ -212,8 +213,11 @@ const EditBudget = (props: Record<string, any>) => {
     const normalized = normalizeString(value);
 
     setChanges((prev) => {
-      const existing = budget[name as keyof typeof form];
-      const isDiff = normalized !== (existing ? String(existing) : "");
+      const existing = budget[name as keyof typeof form]?.toString() || "";
+      let isDiff = normalized !== existing;
+      if (name === "label") {
+        isDiff = normalized.replace(/\s*,\s*/g, ",") !== existing;
+      }
       if (isDiff !== prev.has(name)) {
         const newSet = new Set(prev);
         if (isDiff) {
@@ -228,13 +232,7 @@ const EditBudget = (props: Record<string, any>) => {
 
     setErrors((prev) => ({
       ...prev,
-      [name]: validateInput(
-        name,
-        value,
-        name !== "title",
-        undefined,
-        name === "title" ? 30 : undefined
-      ),
+      [name]: validateInput(name, value, name !== "title"),
     }));
     setForm((prev) => ({
       ...prev,
@@ -287,16 +285,19 @@ const EditBudget = (props: Record<string, any>) => {
   };
 
   const handleRepeat = () => {
-    setChanges((prev) => {
-      const newSet = new Set(prev);
-      if (!form.repeat === !!budget.repeat) {
-        newSet.delete("repeat");
-      } else {
-        newSet.add("repeat");
-      }
-      return newSet;
+    setForm((prevForm) => {
+      prevForm.repeat = prevForm.repeat === 1 ? 0 : 1;
+      setChanges((prevChanges) => {
+        const newSet = new Set(prevChanges);
+        if (prevForm.repeat === budget.repeat) {
+          newSet.delete("repeat");
+        } else {
+          newSet.add("repeat");
+        }
+        return newSet;
+      });
+      return { ...prevForm };
     });
-    setForm((prev) => ({ ...prev, repeat: !prev.repeat }));
   };
 
   const handleAction = () => {
@@ -345,9 +346,9 @@ const EditBudget = (props: Record<string, any>) => {
           let value: string | number | null = "";
           switch (change) {
             case "label":
-              value =
-                form.label?.map((str) => normalizeString(str)).join(",") ||
-                null;
+              value = form.label
+                ? normalizeString(form.label).replace(/\s*,\s*/g, ",")
+                : null;
               break;
             case "start":
               value = form.start.toISOString();
@@ -441,29 +442,22 @@ const EditBudget = (props: Record<string, any>) => {
           </View>
           <View className=" mb-[20px] flex-col gap-[20px] p-[20px] rounded-[20px] border border-divider ">
             <LabelInput
-              {...{
-                expenseValue: budget.label,
-                value: form.label,
-                input: labelInput,
-                changed: changes.has("label"),
-                touched: changes.has("label"),
-                required: false,
-                showBorder: false,
-                placeholderText: "e.g Groceries",
-                helperText:
-                  "Enter the label you want to set a budget for. (Leave this empty if you want to track all expenses)",
-                error: errors.label,
-                setForm,
-                setErrors,
-                setChanges,
-                setInput: setLabelInput,
-                setTouched,
-              }}
+              value={form.label}
+              showBorder={false}
+              placeHolder="e.g Groceries"
+              helperText={
+                "Enter the label you want to set a budget for. (Leave this empty if you want to track all expenses)"
+              }
+              handleBlur={handleBlur}
+              handleChange={handleChange}
+              error={errors.label}
+              touched={touched.has("label")}
+              changed={changes.has("label")}
             />
             <InputField
               name="total"
               label="Maximum"
-              placeholder="e.g Ksh 50,000"
+              placeholder={`e.g ${currency} 50,000`}
               required
               value={form.total}
               handleChange={handleChange}
@@ -519,7 +513,7 @@ const EditBudget = (props: Record<string, any>) => {
                 </View>
               </MenuView>
             </View>
-            {!form.label?.length && form.duration === "custom" && (
+            {!form.label && form.duration === "custom" && (
               <InputField
                 name={"title"}
                 value={form.title}

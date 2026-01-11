@@ -33,11 +33,10 @@ const EditDictionary = (props: Record<string, any>) => {
     close: () => void;
   };
 
-  const [form, setForm] = useState<{ label: string[]; match: string }>({
-    label: [],
+  const [form, setForm] = useState<{ label: string; match: string }>({
+    label: "",
     match: "",
   });
-  const [labelInput, setLabelInput] = useState<string>("");
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [changes, setChanges] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<{ label: string; match: string }>({
@@ -48,10 +47,9 @@ const EditDictionary = (props: Record<string, any>) => {
 
   useEffect(() => {
     setForm((prev) => ({
-      label: item.label ? item.label.split(",") : [],
+      label: item.label ? item.label : "",
       match: item.match || "",
     }));
-    setLabelInput(item.label?.replaceAll(",", ", ") || "");
     setErrors((prev) => ({
       label: item.label ? "" : "required",
       match: item.match ? "" : "required",
@@ -65,8 +63,11 @@ const EditDictionary = (props: Record<string, any>) => {
     const normalized = normalizeString(value);
 
     setChanges((prev) => {
-      const existing = item[name as keyof typeof form];
-      const isDiff = normalized !== (existing ? String(existing) : "");
+      const existing = item[name as keyof typeof form]?.toString() || "";
+      let isDiff = normalized !== existing;
+      if (name === "label") {
+        isDiff = normalized.replace(/\s*,\s*/g, ",") !== existing;
+      }
 
       if (isDiff !== prev.has(name)) {
         const newSet = new Set(prev);
@@ -130,11 +131,12 @@ const EditDictionary = (props: Record<string, any>) => {
         let update: Record<string, any> = {};
 
         for (let change of [...changes]) {
-          let value: string | number = "";
+          let value: string | number | null = "";
           switch (change) {
             case "label":
-              value =
-                form.label?.map((str) => normalizeString(str)).join(",") || "";
+              value = form.label
+                ? normalizeString(form.label).replace(/\s*,\s*/g, ",")
+                : null;
               break;
             default:
               const fktypescript = form[change as keyof typeof form];
@@ -220,6 +222,7 @@ const EditDictionary = (props: Record<string, any>) => {
               />
             ) : (
               <RecipientInput
+                name={"match"}
                 value={form.match}
                 placeHolder="e.g Quickmart Kilimani"
                 handleBlur={handleBlur}
@@ -230,22 +233,15 @@ const EditDictionary = (props: Record<string, any>) => {
               />
             )}
             <LabelInput
-              {...{
-                expenseValue: item.label,
-                value: form.label,
-                input: labelInput,
-                showBorder: false,
-                changed: changes.has("label"),
-                touched: changes.has("label"),
-                placeholderText: "e.g Groceries",
-                helperText: `Enter the label you want to assign for the above ${matchType}.`,
-                error: errors.label,
-                setForm,
-                setErrors,
-                setChanges,
-                setInput: setLabelInput,
-                setTouched,
-              }}
+              required={true}
+              value={form.label}
+              placeHolder="e.g Groceries"
+              helperText={`Enter the label you want to assign for the above ${matchType}.`}
+              handleBlur={handleBlur}
+              handleChange={handleChange}
+              error={errors.label}
+              touched={touched.has("label")}
+              changed={changes.has("label")}
             />
           </View>
         </View>

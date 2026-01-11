@@ -9,6 +9,7 @@ const InputField = ({
   error,
   touched,
   changed,
+  helperText,
   required = false,
   showLabel = true,
   handleFocus,
@@ -23,6 +24,7 @@ const InputField = ({
   changed?: boolean;
   required?: boolean;
   showLabel?: boolean;
+  helperText?: string;
   handleFocus?: (ref: React.RefObject<TextInput | null>) => void;
   handleChange: (name: string, value: string) => void;
   handleBlur: (name: string) => void;
@@ -53,12 +55,14 @@ const InputField = ({
               : "border-divider"
           } dark:color-white dark:focus:border-white ${props.className} `}
         />
-        {error && touched ? (
-          <Text className=" text-[0.9rem] text-error ml-[10px]  ">
-            {name} {error}
+        {((!!error && !!touched) || !!helperText) && (
+          <Text
+            className={` text-[0.9rem] ml-[10px] ${
+              !!error && !!touched ? "text-error" : "text-divider"
+            } `}
+          >
+            {!!error && !!touched ? `${name} ${error}` : helperText}
           </Text>
-        ) : (
-          <></>
         )}
       </View>
     </View>
